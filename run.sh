@@ -8,7 +8,7 @@
 #SBATCH --mem=80GB
 #SBATCH --mail-user=u1418772@utah.edu
 #SBATCH --mail-type=FAIL,END
-#SBATCH -o assignment_3-%j
+#SBATCH -o final_project-%j
 #SBATCH --export=ALL
 
 source ~/miniconda3/etc/profile.d/conda.sh
