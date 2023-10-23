@@ -5,6 +5,24 @@ import numpy as np
 import torch
 import jsonlines 
 import random 
+from sklearn.metrics import f1_score
+
+def iou_f1_score(generated_explanation, target_explanation):
+    # Convert explanations to sets of words
+    generated_set = set(generated_explanation.split())
+    target_set = set(target_explanation.split())
+    
+    # Calculate the intersection and union of the sets
+    intersection = len(generated_set.intersection(target_set))
+    union = len(generated_set) + len(target_set) - intersection
+    
+    # Calculate IOU F1 score
+    if union == 0:
+        return 1.0  # Handle the case of an empty union
+    else:
+        iou = intersection / union
+        f1 = 2 * (iou) / (iou + 1)  # Calculate F1 score from IOU
+        return f1
 
 def imdb_data(args):
     from datasets import load_dataset
@@ -30,6 +48,7 @@ def imdb_data(args):
 
 def imdb_llama2(args): 
     print ("Loading data")
+
     nyc_data_five_val = []
     with jsonlines.open('imdb/val.jsonl') as reader:
         for obj in reader:
@@ -79,25 +98,10 @@ def imdb_llama2(args):
     for i, val_inst in enumerate(nyc_data_five_val):         
         # ======================> ADD YOUR CODE TO DEFINE A PROMPT WITH TWO TRAIN EXAMPLES/DEMONSTRATIONS/SHOTS <======================
         #few shot prompt
+
         prompt =  f"Please use yes or not to answer whether the movie review is positive or not and then use report important phrases to explain the reason? {train_inst_1['input']} [/INST] {train_inst_1['target']} </s><s>[INST]\
         Please use yes or not to answer whether the movie review is positive or not and then use report important phrases to explain the reason? {train_inst_2['input']} [/INST] {train_inst_2['target']} </s><s>[INST]\
         According to the above two examples, please use yes or not to answer whether the movie review is positive or not and then use report important phrases to explain the reason? {val_inst['input']} [/INST]"         
-
-        '''
-        prompt = "<s>[INST] <<SYS>>\n" +\
-            "You are a helpful, respectful and honest assistant. Always answer as helpfully as possible, while being safe.  \
-                Your answers should not include any harmful, unethical, racist, sexist, toxic, dangerous, or illegal content. \
-                    Please ensure that your responses are socially unbiased.\n" +\
-            "If a question does not make any sense, or is not factually coherent, explain why instead of answering something not correct. \
-                If you don't know the answer to a question, please don't share false information.\n" + "<</SYS>>\n" +\
-            "Can you use yes or not to answer whether the movie review is positive or not and then use report important phrases to explain the reason?" +\
-                  "The joke is " + nyc_data_train_two[0]['input'] + "[/INST]" + nyc_data_train_two[0]['target'] + "</s><s>[INST]" +\
-                         "Can you answer use yes or not to answer whether the movie review is positive or not and then use report important phrases to explain the reason?" +\
-                             "The joke is " + nyc_data_train_two[1]['input'] + "[/INST]" + nyc_data_train_two[1]['target'] +\
-                             "</s><s>[INST]" + "Can you use yes or not to answer whether the movie review is positive or not and then use report important phrases to explain the reason?" + \
-                                "The joke is " + val_inst['input'] + "[/INST]"        
-        '''
-
 
         sequences = pipeline(
             prompt,
@@ -108,6 +112,11 @@ def imdb_llama2(args):
         
         gen_expl = sequences[0]['generated_text'].split("/INST] ")[-1]
         nyc_data_five_val[i]['generated_llama2']=gen_expl      
+        
+        #calculate Intersection-over-Union (IOU) F1
+        target_explanation = nyc_data_five_val[i]['target']
+        iou_f1 = iou_f1_score(gen_expl, target_explanation)
+        nyc_data_five_val[i]['iou_f1_score'] = iou_f1
 
     filename = 'imdb/val.jsonl'
     with jsonlines.open(filename, mode='w') as writer:
