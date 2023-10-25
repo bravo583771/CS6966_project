@@ -113,8 +113,8 @@ def movie_rationales_llama2(args):
         label_train_1 = label4prompt(nyc_data_train_two[1]['target']) # 0 = negative, 1 = positive
         
         #two-shot
-        #1: 0.219
-        
+        #1: 0.21913117277650862
+        '''
         prompt =  "Please use yes or no to answer whether the movie review is positive or not and then list important phrases" +\
             nyc_data_train_two[0]['input'] + "[/INST]" + label_train_0 +\
                 " the important phrases are " + str(nyc_data_train_two[0]['highlight']) + "</s><s>[INST]" +\
@@ -123,10 +123,10 @@ def movie_rationales_llama2(args):
                          " the important phrases are " + str(nyc_data_train_two[1]['highlight']) + "</s><s>[INST]" +\
                             "According to the above two examples, please use yes or no to answer whether the movie review is positive or not and then list important phrases" +\
                               val_inst['input'] + "[/INST]"           
-        
+        '''
         #zero-shot
         '''
-        #0.193
+        #0.19329531802908942
         prompt =  "Please use yes or no to answer whether the movie review is positive or not and then list important phrases" +\
                         val_inst['input'] + "[/INST]"        
         '''
@@ -142,15 +142,15 @@ def movie_rationales_llama2(args):
                     "According to the above example, please answer whether the movie review is positive or negative and then report important phrases to explain the reason." +\
                         val_inst['input'] + "[/INST]"    
         '''
-        '''
-        #2: 0.211
+        
+        #2: 0.21088923922994768
         prompt =  "Please use yes or no to answer whether the movie review is positive or negative and then list important phrases" +\
             nyc_data_train_two[0]['input'] + "[/INST]" + label_train_0 +\
                 " the important phrases are " + str(nyc_data_train_two[0]['highlight']) + "</s><s>[INST]" +\
                     "According to the above example, please use yes or no to answer whether the movie review is positive or negative and then list important phrases" +\
                         val_inst['input'] + "[/INST]"            
         
-        '''
+        
 
         max_token_limit = 4096
         sequences = pipeline(
