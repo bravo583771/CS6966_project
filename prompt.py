@@ -45,6 +45,12 @@ def newyorker_caption_contest_data(task_name = 'movie_rationales'):
         res[spl_name] = cur_spl
     return res
 
+def label4prompt(label):
+    # 0 = negative, 1 = positive
+    return "yes" if label==1 else "no" 
+    #return "Yes, the movie review is positive." if label==1 else "No, the movie review is negative." 
+    #return "positive" if label==1 else "negative" 
+    #return "The movie review is " + "positive." if label==1 else "negative." 
 
 def newyorker_caption_contest_llama2(args): 
     print("Loading data")
@@ -97,8 +103,8 @@ def newyorker_caption_contest_llama2(args):
 
     for i, val_inst in enumerate(nyc_data_five_val):         
         # ======================> ADD YOUR CODE TO DEFINE A PROMPT WITH TWO TRAIN EXAMPLES/DEMONSTRATIONS/SHOTS <======================
-        label_train_0 = "yes" if nyc_data_train_two[0]['target']==1 else "no" # 0 = negative, 1 = positive
-        label_train_1 = "yes" if nyc_data_train_two[1]['target']==1 else "no" # 0 = negative, 1 = positive
+        label_train_0 = label4prompt(nyc_data_train_two[0]['target']) # 0 = negative, 1 = positive
+        label_train_1 = label4prompt(nyc_data_train_two[1]['target']) # 0 = negative, 1 = positive
         #prompt =  "Please use yes or not to answer whether the movie review is positive or not and then use report important phrases to explain the reason?" +\
         #    nyc_data_train_two[0]['input'] + "[/INST]" + label_train_0 +\
         #        " the important phrases are " + str(nyc_data_train_two[0]['highlight']) + "</s><s>[INST]" +\
@@ -107,10 +113,11 @@ def newyorker_caption_contest_llama2(args):
         #                 " the important phrases are " + str(nyc_data_train_two[1]['highlight']) + "</s><s>[INST]" +\
         #                    "According to the above two examples, please use yes or not to answer whether the movie review is positive or not and then use report important phrases to explain the reason?" +\
         #                      val_inst['input'] + "[/INST]"     
-        prompt =  "Please use yes or not to answer whether the movie review is positive or not and then use report important phrases to explain the reason?" +\
+        prompt =  "Please use yes or not to answer whether the movie review is positive or negative and then report important phrases to explain the reason." +\
             nyc_data_train_two[0]['input'] + "[/INST]" + label_train_0 +\
-                "According to the above example, please use yes or not to answer whether the movie review is positive or not and then use report important phrases to explain the reason?" +\
-                    val_inst['input'] + "[/INST]"    
+                " the important phrases are " + str(nyc_data_train_two[0]['highlight']) + "</s><s>[INST]" +\
+                    "According to the above example, please use yes or not to answer whether the movie review is positive or negative and then report important phrases to explain the reason." +\
+                        val_inst['input'] + "[/INST]"    
 
         sequences = pipeline(
             prompt,
@@ -123,7 +130,7 @@ def newyorker_caption_contest_llama2(args):
         nyc_data_five_val[i]['generated_llama2']=gen_expl
 
         #calculate Intersection-over-Union (IOU) F1
-        label_val = "yes" if nyc_data_five_val[i]['target']==1 else "no" # 0 = negative, 1 = positive
+        label_val = label4prompt(nyc_data_five_val[i]['target']) # 0 = negative, 1 = positive
         target_explanation = label_val + " the important phrases are " + str(nyc_data_five_val[i]['highlight'])
         iou_f1 = iou_f1_score(gen_expl, target_explanation)
         nyc_data_five_val[i]['iou_f1_score'] = iou_f1
