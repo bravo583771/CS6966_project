@@ -4,7 +4,7 @@ import torch
 import jsonlines 
 import random 
 import os
-from sklearn.metrics import f1_score
+#from sklearn.metrics import f1_score
 
 def iou_f1_score(generated_explanation, target_explanation):
     # Convert explanations to sets of words
@@ -47,10 +47,10 @@ def newyorker_caption_contest_data(task_name = 'movie_rationales'):
 
 def label4prompt(label):
     # 0 = negative, 1 = positive
-    return "yes" if label==1 else "no" 
+    #return "yes" if label==1 else "no" 
     #return "Yes, the movie review is positive." if label==1 else "No, the movie review is negative." 
     #return "positive" if label==1 else "negative" 
-    #return "The movie review is " + "positive." if label==1 else "negative." 
+    return "The movie review is " + "positive." if label==1 else "negative." 
 
 def newyorker_caption_contest_llama2(args): 
     print("Loading data")
@@ -113,10 +113,11 @@ def newyorker_caption_contest_llama2(args):
         #                 " the important phrases are " + str(nyc_data_train_two[1]['highlight']) + "</s><s>[INST]" +\
         #                    "According to the above two examples, please use yes or not to answer whether the movie review is positive or not and then use report important phrases to explain the reason?" +\
         #                      val_inst['input'] + "[/INST]"     
-        prompt =  "Please use yes or not to answer whether the movie review is positive or negative and then report important phrases to explain the reason." +\
+        #prompt =  "Please use yes or not to answer whether the movie review is positive or negative and then report important phrases to explain the reason." +\
+        prompt =  "Please answer whether the movie review is positive or negative and then report important phrases to explain the reason." +\
             nyc_data_train_two[0]['input'] + "[/INST]" + label_train_0 +\
                 " the important phrases are " + str(nyc_data_train_two[0]['highlight']) + "</s><s>[INST]" +\
-                    "According to the above example, please use yes or not to answer whether the movie review is positive or negative and then report important phrases to explain the reason." +\
+                    "According to the above example, please answer whether the movie review is positive or negative and then report important phrases to explain the reason." +\
                         val_inst['input'] + "[/INST]"    
 
         sequences = pipeline(
