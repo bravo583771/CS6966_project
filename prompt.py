@@ -6,6 +6,8 @@ import random
 import os
 #from sklearn.metrics import f1_score
 
+
+
 def iou_f1_score(generated_explanation, target_explanation):
     # Convert explanations to sets of words
     generated_set = set(generated_explanation.split())
@@ -23,6 +25,22 @@ def iou_f1_score(generated_explanation, target_explanation):
         f1 = 2 * (iou) / (iou + 1)  # Calculate F1 score from IOU
         return f1
     
+def token_f1_score(model_highlights, human_highlights):
+    # Convert highlights to sets of tokens
+    model_tokens = set(model_highlights.split())
+    human_tokens = set(human_highlights.split())
+
+    # Calculate token precision and recall
+    common_tokens = model_tokens.intersection(human_tokens)
+    token_precision = len(common_tokens) / len(model_tokens) if len(model_tokens) > 0 else 0
+    token_recall = len(common_tokens) / len(human_tokens) if len(human_tokens) > 0 else 0
+
+    # Calculate Token F1 score
+    if token_precision + token_recall == 0:
+        return 0.0  # Handle the case of zero precision and recall
+    else:
+        token_f1 = 2 * (token_precision * token_recall) / (token_precision + token_recall)
+        return token_f1
 
 def movie_rationales_data(task_name = 'movie_rationales'):
     from datasets import load_dataset
@@ -55,8 +73,8 @@ def label4prompt(label):
 def movie_rationales_llama2(args): 
     print("Loading data")
     nyc_data = movie_rationales_data(args.task_name)
-    nyc_data_five_val = random.sample(nyc_data['val'],5)
     nyc_data_train_two = random.sample(nyc_data['train'],2)
+    nyc_data_five_val = random.sample(nyc_data['val'],5)
     
     #print ("Loading data")
     #nyc_data_five_val = []
@@ -73,23 +91,8 @@ def movie_rationales_llama2(args):
     import torch
 
     print("Loading model")
-    '''
-    Ideally, we'd do something similar to what we have been doing before: 
 
-        tokenizer = AutoTokenizer.from_pretrained(args.llama2_checkpoint, padding_side="left")
-        model = AutoModelForCausalLM.from_pretrained(args.llama2_checkpoint, torch_dtype=torch.float16, device_map="auto")
-        tokenizer.pad_token = tokenizer.unk_token_id
-        
-        prompts = [ "our prompt" for val_inst in nyc_data_five_val]
 
-        inputs = tokenizer(prompts, return_tensors="pt", padding=True).to(model.device)
-
-        output_sequences = model.generate(**inputs, max_new_tokens=1024, do_sample=False)
-        generated_text = [tokenizer.decode(s, skip_special_tokens=True) for s in output_sequences]
-
-    But I cannot produce text with this prototypical code with HF llama2. 
-    Thus we will use pipeline instead. 
-    '''
     import transformers
     from transformers import AutoTokenizer
     tokenizer = AutoTokenizer.from_pretrained(args.llama2_checkpoint, cache_dir = args.cache_dir)
@@ -101,41 +104,87 @@ def movie_rationales_llama2(args):
         device_map="auto",
     )
 
+    iou_f1_scores = []
+    token_f1_scores = []
+
     for i, val_inst in enumerate(nyc_data_five_val):         
         # ======================> ADD YOUR CODE TO DEFINE A PROMPT WITH TWO TRAIN EXAMPLES/DEMONSTRATIONS/SHOTS <======================
         label_train_0 = label4prompt(nyc_data_train_two[0]['target']) # 0 = negative, 1 = positive
         label_train_1 = label4prompt(nyc_data_train_two[1]['target']) # 0 = negative, 1 = positive
-        #prompt =  "Please use yes or not to answer whether the movie review is positive or not and then use report important phrases to explain the reason?" +\
-        #    nyc_data_train_two[0]['input'] + "[/INST]" + label_train_0 +\
-        #        " the important phrases are " + str(nyc_data_train_two[0]['highlight']) + "</s><s>[INST]" +\
-        #            "Please use yes or not to answer whether the movie review is positive or not and then use report important phrases to explain the reason?" +\
-        #              nyc_data_train_two[1]['input'] + "[/INST]"  + label_train_1 +\
-        #                 " the important phrases are " + str(nyc_data_train_two[1]['highlight']) + "</s><s>[INST]" +\
-        #                    "According to the above two examples, please use yes or not to answer whether the movie review is positive or not and then use report important phrases to explain the reason?" +\
-        #                      val_inst['input'] + "[/INST]"     
-        #prompt =  "Please use yes or not to answer whether the movie review is positive or negative and then report important phrases to explain the reason." +\
+        
+        #two-shot
+        #1: 0.219
+        prompt =  "Please use yes or no to answer whether the movie review is positive or not and then list important phrases" +\
+            nyc_data_train_two[0]['input'] + "[/INST]" + label_train_0 +\
+                " the important phrases are " + str(nyc_data_train_two[0]['highlight']) + "</s><s>[INST]" +\
+                    "Please use yes or no to answer whether the movie review is positive or not and then list important phrases" +\
+                      nyc_data_train_two[1]['input'] + "[/INST]"  + label_train_1 +\
+                         " the important phrases are " + str(nyc_data_train_two[1]['highlight']) + "</s><s>[INST]" +\
+                            "According to the above two examples, please use yes or no to answer whether the movie review is positive or not and then list important phrases" +\
+                              val_inst['input'] + "[/INST]"           
+        
+  
+        
+        #zero-shot
+        '''
+        #0.193
+        prompt =  "Please use yes or no to answer whether the movie review is positive or not and then list important phrases" +\
+                        val_inst['input'] + "[/INST]"        
+        '''
+        
+        
+        #one-shot
+        
+        '''
+        # 1: 0.194
         prompt =  "Please answer whether the movie review is positive or negative and then report important phrases to explain the reason." +\
             nyc_data_train_two[0]['input'] + "[/INST]" + label_train_0 +\
                 " the important phrases are " + str(nyc_data_train_two[0]['highlight']) + "</s><s>[INST]" +\
                     "According to the above example, please answer whether the movie review is positive or negative and then report important phrases to explain the reason." +\
                         val_inst['input'] + "[/INST]"    
+        '''
+        '''
+        #2: 0.211
+        prompt =  "Please use yes or no to answer whether the movie review is positive or negative and then list important phrases" +\
+            nyc_data_train_two[0]['input'] + "[/INST]" + label_train_0 +\
+                " the important phrases are " + str(nyc_data_train_two[0]['highlight']) + "</s><s>[INST]" +\
+                    "According to the above example, please use yes or no to answer whether the movie review is positive or negative and then list important phrases" +\
+                        val_inst['input'] + "[/INST]"            
+        
+        '''
 
+
+        max_token_limit = 4096
         sequences = pipeline(
             prompt,
             do_sample=True,
             eos_token_id=tokenizer.eos_token_id,
-            max_length=4096,
+            max_length=max_token_limit,
         )
         
         gen_expl = sequences[0]['generated_text'].split("/INST]")[-1]
+
         nyc_data_five_val[i]['generated_llama2']=gen_expl
 
-        #calculate Intersection-over-Union (IOU) F1
+        ##Faithfulness##
+        #calculate Sufficiency & Comprehensiveness
+
+        ##Plausibility##
+        #calculate Intersection-over-Union (IOU) F1 anf Token F1
         label_val = label4prompt(nyc_data_five_val[i]['target']) # 0 = negative, 1 = positive
         target_explanation = label_val + " the important phrases are " + str(nyc_data_five_val[i]['highlight'])
         iou_f1 = iou_f1_score(gen_expl, target_explanation)
         nyc_data_five_val[i]['iou_f1_score'] = iou_f1
+        token_f1 = token_f1_score(gen_expl, target_explanation)
+        nyc_data_five_val[i]['token_f1_score'] = token_f1
 
+        iou_f1_scores.append(iou_f1)
+        token_f1_scores.append(token_f1)
+
+    average_iou_f1 = sum(iou_f1_scores) / len(iou_f1_scores)
+    average_token_f1 = sum(token_f1_scores) / len(token_f1_scores)
+    print("Average IOU F1 Score:", average_iou_f1)
+    print("Average Token F1 Score:", average_token_f1)
 
     filename = 'out/val.jsonl'
     with jsonlines.open(filename, mode='w') as writer:
