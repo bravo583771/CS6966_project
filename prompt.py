@@ -24,7 +24,7 @@ def iou_f1_score(generated_explanation, target_explanation):
         return f1
     
 
-def newyorker_caption_contest_data(task_name = 'movie_rationales'):
+def movie_rationales_data(task_name = 'movie_rationales'):
     from datasets import load_dataset
     dset = load_dataset(task_name)
 
@@ -50,11 +50,11 @@ def label4prompt(label):
     #return "yes" if label==1 else "no" 
     #return "Yes, the movie review is positive." if label==1 else "No, the movie review is negative." 
     #return "positive" if label==1 else "negative" 
-    return "The movie review is " + "positive." if label==1 else "negative." 
+    return "The movie review is " + ("positive." if label==1 else "negative.")
 
-def newyorker_caption_contest_llama2(args): 
+def movie_rationales_llama2(args): 
     print("Loading data")
-    nyc_data = newyorker_caption_contest_data(args.task_name)
+    nyc_data = movie_rationales_data(args.task_name)
     nyc_data_five_val = random.sample(nyc_data['val'],5)
     nyc_data_train_two = random.sample(nyc_data['train'],2)
     
@@ -163,4 +163,4 @@ if __name__ == '__main__':
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed(args.seed)
 
-    newyorker_caption_contest_llama2(args)
+    movie_rationales_llama2(args)
