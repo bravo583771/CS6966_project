@@ -114,7 +114,7 @@ def movie_rationales_llama2(args):
         
         #two-shot
         #1: 0.219
-        '''
+        
         prompt =  "Please use yes or no to answer whether the movie review is positive or not and then list important phrases" +\
             nyc_data_train_two[0]['input'] + "[/INST]" + label_train_0 +\
                 " the important phrases are " + str(nyc_data_train_two[0]['highlight']) + "</s><s>[INST]" +\
@@ -123,13 +123,13 @@ def movie_rationales_llama2(args):
                          " the important phrases are " + str(nyc_data_train_two[1]['highlight']) + "</s><s>[INST]" +\
                             "According to the above two examples, please use yes or no to answer whether the movie review is positive or not and then list important phrases" +\
                               val_inst['input'] + "[/INST]"           
-        '''
-        #zero-shot
         
+        #zero-shot
+        '''
         #0.193
         prompt =  "Please use yes or no to answer whether the movie review is positive or not and then list important phrases" +\
                         val_inst['input'] + "[/INST]"        
-        
+        '''
         
         
         #one-shot
