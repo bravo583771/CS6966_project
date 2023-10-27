@@ -73,8 +73,8 @@ def label4prompt(label):
 def movie_rationales_llama2(args): 
     print("Loading data")
     nyc_data = movie_rationales_data(args.task_name)
-    nyc_data_train_two = random.sample(nyc_data['train'],2)
-    nyc_data_five_val = random.sample(nyc_data['val'],5)
+    nyc_data_train_two = random.sample(nyc_data['train'], 2)
+    nyc_data_five_val = random.sample(nyc_data['val'], args.val_size)
     
     #print ("Loading data")
     #nyc_data_five_val = []
@@ -112,45 +112,57 @@ def movie_rationales_llama2(args):
         label_train_0 = label4prompt(nyc_data_train_two[0]['target']) # 0 = negative, 1 = positive
         label_train_1 = label4prompt(nyc_data_train_two[1]['target']) # 0 = negative, 1 = positive
         
-        #two-shot
-        #1: 0.21913117277650862
-        '''
-        prompt =  "Please use yes or no to answer whether the movie review is positive or not and then list important phrases" +\
-            nyc_data_train_two[0]['input'] + "[/INST]" + label_train_0 +\
-                " the important phrases are " + str(nyc_data_train_two[0]['highlight']) + "</s><s>[INST]" +\
-                    "Please use yes or no to answer whether the movie review is positive or not and then list important phrases" +\
-                      nyc_data_train_two[1]['input'] + "[/INST]"  + label_train_1 +\
-                         " the important phrases are " + str(nyc_data_train_two[1]['highlight']) + "</s><s>[INST]" +\
-                            "According to the above two examples, please use yes or no to answer whether the movie review is positive or not and then list important phrases" +\
-                              val_inst['input'] + "[/INST]"           
-        '''
-        #zero-shot
-        '''
-        #0.19329531802908942
-        prompt =  "Please use yes or no to answer whether the movie review is positive or not and then list important phrases" +\
-                        val_inst['input'] + "[/INST]"        
-        '''
+        if args.prompt == "two_shot":
+            '''
+            #1: 0.21913117277650862 for 5 val instances
+            
+            prompt =  "<s>[INST] Please use yes or no to answer whether the movie review is positive or not and then list important phrases" +\
+                nyc_data_train_two[0]['input'] + "[/INST]" + label_train_0 +\
+                    " the important phrases are " + str(nyc_data_train_two[0]['highlight']) + "</s><s>[INST]" +\
+                        "Please use yes or no to answer whether the movie review is positive or not and then list important phrases" +\
+                          nyc_data_train_two[1]['input'] + "[/INST]"  + label_train_1 +\
+                            " the important phrases are " + str(nyc_data_train_two[1]['highlight']) + "</s><s>[INST]" +\
+                                "According to the above two examples, please use yes or no to answer whether the movie review is positive or not and then list important phrases" +\
+                                    val_inst['input'] + "[/INST]"           
+            '''
+
+            prompt =  "<s>[INST] Please answer whether the movie review is positive or negative and then list the important phrases." +\
+                nyc_data_train_two[0]['input'] + "[/INST]" + label_train_0 +\
+                    " the important phrases are " + str(nyc_data_train_two[0]['highlight']) + "</s><s>[INST]" +\
+                        "Please answer whether the movie review is positive or negative and then list the important phrases." +\
+                          nyc_data_train_two[1]['input'] + "[/INST]"  + label_train_1 +\
+                            " the important phrases are " + str(nyc_data_train_two[1]['highlight']) + "</s><s>[INST]" +\
+                                "According to the above two examples, please answer whether the movie review is positive or negative and then list the important phrases." +\
+                                    val_inst['input'] + "[/INST]"           
+        elif args.prompt == "one_shot":
+            # 1: 0.194 for 5 val instances
+            #Average IOU F1 Score: 0.23417253103317495 for 200 instances
+            #Average Token F1 Score: 0.23417253103317495 for 200 instances
+            prompt =  "<s>[INST] Please answer whether the movie review is positive or negative and then report important phrases to explain the reason." +\
+                nyc_data_train_two[0]['input'] + "[/INST]" + label_train_0 +\
+                    " the important phrases are " + str(nyc_data_train_two[0]['highlight']) + "</s><s>[INST]" +\
+                        "According to the above example, please answer whether the movie review is positive or negative and then report important phrases to explain the reason." +\
+                            val_inst['input'] + "[/INST]"    
         
-        
-        #one-shot
-        
-        '''
-        # 1: 0.194
-        prompt =  "Please answer whether the movie review is positive or negative and then report important phrases to explain the reason." +\
-            nyc_data_train_two[0]['input'] + "[/INST]" + label_train_0 +\
-                " the important phrases are " + str(nyc_data_train_two[0]['highlight']) + "</s><s>[INST]" +\
-                    "According to the above example, please answer whether the movie review is positive or negative and then report important phrases to explain the reason." +\
-                        val_inst['input'] + "[/INST]"    
-        '''
-        
-        #2: 0.21088923922994768
-        prompt =  "Please use yes or no to answer whether the movie review is positive or negative and then list important phrases" +\
-            nyc_data_train_two[0]['input'] + "[/INST]" + label_train_0 +\
-                " the important phrases are " + str(nyc_data_train_two[0]['highlight']) + "</s><s>[INST]" +\
-                    "According to the above example, please use yes or no to answer whether the movie review is positive or negative and then list important phrases" +\
-                        val_inst['input'] + "[/INST]"            
-        
-        
+            '''
+            #2: 0.21088923922994768 for 5 val instances
+            #Even though the iou score is higher, the answer is incorrect 
+            #Yes, the movie is nagative -----should be ----->  No, the movie is nagative
+            prompt =  "<s>[INST] Please use yes or no to answer whether the movie review is positive or negative and then list important phrases" +\
+                nyc_data_train_two[0]['input'] + "[/INST]" + label_train_0 +\
+                    " the important phrases are " + str(nyc_data_train_two[0]['highlight']) + "</s><s>[INST]" +\
+                        "According to the above example, please use yes or no to answer whether the movie review is positive or negative and then list important phrases" +\
+                            val_inst['input'] + "[/INST]"            
+            '''
+        elif args.prompt == "zero_shot":
+            #0.19329531802908942 for 5 val instances
+            #prompt =  "<s>[INST] Please use yes or no to answer whether the movie review is positive or not and then list important phrases" +\
+            #                val_inst['input'] + "[/INST]" 
+
+            #Average IOU F1 Score: 0.20651007013833375 for 200 instances
+            #Average Token F1 Score: 0.20651007013833375 for 200 instances
+            prompt =  "<s>[INST] Please answer whether the movie review is positive or negative and then report important phrases to explain the reason." +\
+                            val_inst['input'] + "[/INST]"                
 
         max_token_limit = 4096
         sequences = pipeline(
@@ -178,13 +190,14 @@ def movie_rationales_llama2(args):
 
         iou_f1_scores.append(iou_f1)
         token_f1_scores.append(token_f1)
+        #print("Instance {} done.".format(i))
 
     average_iou_f1 = sum(iou_f1_scores) / len(iou_f1_scores)
     average_token_f1 = sum(token_f1_scores) / len(token_f1_scores)
     print("Average IOU F1 Score:", average_iou_f1)
     print("Average Token F1 Score:", average_token_f1)
 
-    filename = 'out/val.jsonl'
+    filename = 'out/val_' + args.prompt + '.jsonl'
     with jsonlines.open(filename, mode='w') as writer:
         for item in nyc_data_five_val:
             writer.write(item)
@@ -203,7 +216,11 @@ if __name__ == '__main__':
     parser.add_argument('--task_name', default="movie_rationales",  type=str, help='Name of the task that will be used by huggingface load dataset')    
     #parser.add_argument('--subtask', default="explanation", type=str, help="The contest has three subtasks: matching, ranking, explanation")
     parser.add_argument('--llama2_checkpoint', default="meta-llama/Llama-2-7b-chat-hf", type=str, help="The hf name of a llama2 checkpoint")
+    parser.add_argument('--val_size', default=200, type=int, help="The sample size of validation dataset.")
+    parser.add_argument('--prompt', default="one_shot", type=str, help="Control the type of prompt.")
     args = parser.parse_args()
+    if args.prompt not in ["zero_shot", "one_shot", "two_shot"]:
+        raise ValueError("Arg \"-prompt\" should be \"zero_shot\", \"one_shot\", or \"two_shot\"")
 
     random.seed(args.seed)
     np.random.seed(args.seed)
