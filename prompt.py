@@ -126,6 +126,8 @@ def movie_rationales_llama2(args):
                                     val_inst['input'] + "[/INST]"           
             '''
 
+            #Average IOU F1 Score: 0.2347728843342933 for 200 instances
+            #Average Token F1 Score: 0.23477288433429325 for 200 instances
             prompt =  "<s>[INST] Please answer whether the movie review is positive or negative and then list the important phrases." +\
                 nyc_data_train_two[0]['input'] + "[/INST]" + label_train_0 +\
                     " the important phrases are " + str(nyc_data_train_two[0]['highlight']) + "</s><s>[INST]" +\
