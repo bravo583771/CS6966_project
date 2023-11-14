@@ -127,8 +127,8 @@ def movie_rationales_llama2(args):
             '''
 
             
-            #Average IOU F1 Score: 0.2347728843342933 for 200 instances
-            #Average Token F1 Score: 0.23477288433429325 for 200 instances
+            #Average IOU F1 Score: 0.24472592482987424 for 200 instances
+            #Average Token F1 Score: 0.24472592482987424 for 200 instances
             prompt =  "<s>[INST] Please answer whether the movie review is positive or negative and then list the important phrases." +\
                 nyc_data_train_two[0]['input'] + "[/INST]" + label_train_0 +\
                     " the important phrases are " + str(nyc_data_train_two[0]['highlight']) + "</s><s>[INST]" +\
@@ -143,8 +143,8 @@ def movie_rationales_llama2(args):
 
             
             # 1: 0.194 for 5 val instances
-            #Average IOU F1 Score: 0.23417253103317495 for 200 instances
-            #Average Token F1 Score: 0.23417253103317495 for 200 instances
+            #Average IOU F1 Score: 0.23042911440679834 for 200 instances
+            #Average Token F1 Score: 0.2304291144067983 for 200 instances
             prompt =  "<s>[INST] Please answer whether the movie review is positive or negative and then report important phrases to explain the reason." +\
                 nyc_data_train_two[0]['input'] + "[/INST]" + label_train_0 +\
                     " the important phrases are " + str(nyc_data_train_two[0]['highlight']) + "</s><s>[INST]" +\
@@ -169,8 +169,8 @@ def movie_rationales_llama2(args):
             #prompt =  "<s>[INST] Please use yes or no to answer whether the movie review is positive or not and then list important phrases" +\
             #                val_inst['input'] + "[/INST]" 
 
-            #Average IOU F1 Score: 0.20651007013833375 for 200 instances
-            #Average Token F1 Score: 0.20651007013833375 for 200 instances
+            #Average IOU F1 Score: 0.23420844552028455 for 200 instances
+            #Average Token F1 Score: 0.23420844552028455 for 200 instances
 
             prompt =  "<s>[INST] Please answer whether the movie review is positive or negative and then report important phrases to explain the reason. Format your response starting with either 'the review is positive' or 'the review is negative." +\
                             val_inst['input'] + "[/INST]"                
