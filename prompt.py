@@ -126,6 +126,7 @@ def movie_rationales_llama2(args):
                                     val_inst['input'] + "[/INST]"           
             '''
 
+            
             #Average IOU F1 Score: 0.2347728843342933 for 200 instances
             #Average Token F1 Score: 0.23477288433429325 for 200 instances
             prompt =  "<s>[INST] Please answer whether the movie review is positive or negative and then list the important phrases." +\
@@ -134,17 +135,23 @@ def movie_rationales_llama2(args):
                         "Please answer whether the movie review is positive or negative and then list the important phrases." +\
                           nyc_data_train_two[1]['input'] + "[/INST]"  + label_train_1 +\
                             " the important phrases are " + str(nyc_data_train_two[1]['highlight']) + "</s><s>[INST]" +\
-                                "According to the above two examples, please answer whether the movie review is positive or negative and then list the important phrases." +\
-                                    val_inst['input'] + "[/INST]"           
+                                "According to the above two examples, please answer whether the movie review is positive or negative and then list the important phrases. Format your response starting with either 'the review is positive' or 'the review is negative." +\
+                                    val_inst['input'] + "[/INST]"              
+                
+                     
         elif args.prompt == "one_shot":
+
+            
             # 1: 0.194 for 5 val instances
             #Average IOU F1 Score: 0.23417253103317495 for 200 instances
             #Average Token F1 Score: 0.23417253103317495 for 200 instances
             prompt =  "<s>[INST] Please answer whether the movie review is positive or negative and then report important phrases to explain the reason." +\
                 nyc_data_train_two[0]['input'] + "[/INST]" + label_train_0 +\
                     " the important phrases are " + str(nyc_data_train_two[0]['highlight']) + "</s><s>[INST]" +\
-                        "According to the above example, please answer whether the movie review is positive or negative and then report important phrases to explain the reason." +\
-                            val_inst['input'] + "[/INST]"    
+                        "According to the above example, please answer whether the movie review is positive or negative and then report important phrases to explain the reason. Format your response starting with either 'the review is positive' or 'the review is negative." +\
+                            val_inst['input'] + "[/INST]"                
+            
+
         
             '''
             #2: 0.21088923922994768 for 5 val instances
@@ -157,14 +164,17 @@ def movie_rationales_llama2(args):
                             val_inst['input'] + "[/INST]"            
             '''
         elif args.prompt == "zero_shot":
+            
             #0.19329531802908942 for 5 val instances
             #prompt =  "<s>[INST] Please use yes or no to answer whether the movie review is positive or not and then list important phrases" +\
             #                val_inst['input'] + "[/INST]" 
 
             #Average IOU F1 Score: 0.20651007013833375 for 200 instances
             #Average Token F1 Score: 0.20651007013833375 for 200 instances
-            prompt =  "<s>[INST] Please answer whether the movie review is positive or negative and then report important phrases to explain the reason." +\
+
+            prompt =  "<s>[INST] Please answer whether the movie review is positive or negative and then report important phrases to explain the reason. Format your response starting with either 'the review is positive' or 'the review is negative." +\
                             val_inst['input'] + "[/INST]"                
+            
 
         max_token_limit = 4096
         sequences = pipeline(
@@ -219,7 +229,7 @@ if __name__ == '__main__':
     #parser.add_argument('--subtask', default="explanation", type=str, help="The contest has three subtasks: matching, ranking, explanation")
     parser.add_argument('--llama2_checkpoint', default="meta-llama/Llama-2-7b-chat-hf", type=str, help="The hf name of a llama2 checkpoint")
     parser.add_argument('--val_size', default=200, type=int, help="The sample size of validation dataset.")
-    parser.add_argument('--prompt', default="one_shot", type=str, help="Control the type of prompt.")
+    parser.add_argument('--prompt', default="zero_shot", type=str, help="Control the type of prompt.")
     args = parser.parse_args()
     if args.prompt not in ["zero_shot", "one_shot", "two_shot"]:
         raise ValueError("Arg \"-prompt\" should be \"zero_shot\", \"one_shot\", or \"two_shot\"")
