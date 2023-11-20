@@ -6,6 +6,7 @@ https://gist.githubusercontent.com/theDestI/fe9ea0d89386cf00a12e60dd346f2109/raw
 
 import torch
 import pandas as pd
+import numpy as np
 
 from torch import tensor 
 import transformers
@@ -19,6 +20,8 @@ import matplotlib.pyplot as plt
 import argparse 
 import jsonlines
 import os 
+
+from util import *
 
 class ExplainableTransformerPipeline():
     """Wrapper for Captum framework usage with Huggingface Pipeline"""
@@ -48,11 +51,22 @@ class ExplainableTransformerPipeline():
         
         a = pd.Series(attr.cpu().numpy()[0][::-1], 
                          index = self.__pipeline.tokenizer.convert_ids_to_tokens(inputs.detach().cpu().numpy()[0])[::-1])
-        
+        #print(len(self.__pipeline.tokenizer.convert_ids_to_tokens(inputs.detach().cpu().numpy()[0])[::-1]))
+        #print(self.__pipeline.tokenizer.convert_ids_to_tokens(inputs.detach().cpu().numpy()[0])[::-1])
+        #print(attr.cpu().numpy()[0][::-1])
         a.plot.barh(figsize=(10,20))
         plt.savefig(outfile_path)
+    
+    def return_highlight(self, inputs: list, attributes: list, proportion: float):
+        attr_sum = attributes.sum(-1) 
+        
+        attr = attr_sum / torch.norm(attr_sum)
+        
+        k = round(proportion * len(attr.cpu().numpy()[0][::-1]))
+        index = np.argsort(np.absolute(attr.cpu().numpy()[0][::-1]))[:k]
+        return np.array(self.__pipeline.tokenizer.convert_ids_to_tokens(inputs.detach().cpu().numpy()[0])[::-1])[index].tolist()
                       
-    def explain(self, text: str, outfile_path: str):
+    def explain(self, text: str, outfile_path: str, proportion: float):
         """
             Main entry method. Passes text through series of transformations and through the model. 
             Calls visualization method.
@@ -68,7 +82,8 @@ class ExplainableTransformerPipeline():
                                   target = self.__pipeline.model.config.label2id[prediction[0]['label']], 
                                   return_convergence_delta = True)
         # Give a path to save
-        self.visualize(inputs, attributes, outfile_path)
+        return self.return_highlight(inputs, attributes, proportion)
+        #self.visualize(inputs, attributes, outfile_path)
     
     def generate_inputs(self, text: str) -> tensor:
         """
@@ -83,8 +98,8 @@ class ExplainableTransformerPipeline():
         return torch.tensor([self.__pipeline.tokenizer.cls_token_id] + [self.__pipeline.tokenizer.pad_token_id] * (sequence_len - 2) + [self.__pipeline.tokenizer.sep_token_id], device = self.__device).unsqueeze(0)
 
 def main(args):
-    tokenizer = AutoTokenizer.from_pretrained(args.model_checkpoint) 
-    model = AutoModelForSequenceClassification.from_pretrained(args.model_checkpoint, num_labels=args.num_labels)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_checkpoint, cache_dir = args.cache_dir) 
+    model = AutoModelForSequenceClassification.from_pretrained(args.model_checkpoint, num_labels=args.num_labels, cache_dir = args.cache_dir)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     clf = transformers.pipeline("text-classification", 
@@ -95,19 +110,44 @@ def main(args):
     exp_model = ExplainableTransformerPipeline(args.model_checkpoint, clf, device)
 
     idx=0
-    with jsonlines.open(args.a1_analysis_file, 'r') as reader:
+    val_dataset = []
+    
+    with jsonlines.open(os.path.join(args.analsis_dir, args.analysis_file), 'r') as reader:
         for obj in reader:
-            exp_model.explain(obj["review"], os.path.join(args.output_dir,f'example_{idx}'))
-            idx+=1
-            print (f"Example {idx} done")
+            val_dataset.append(obj)
+
+    for i, obj in enumerate(val_dataset):
+        print("The length of the review: {}.".format(len(obj["input"])))
+        if len(obj["input"])<=3900: # avoiding cuda out of memory
+            len_highlight = 0
+            for highlight in obj["highlight"]:
+                len_highlight += len(highlight)
+            proportion = len_highlight/len(obj["input"])
+            #exp_model.explain(obj["input"], os.path.join(args.output_dir,f'example_{idx}'))
+            highlight = exp_model.explain(obj["input"], os.path.join(args.output_dir,f'example_{idx}'), proportion)
+            print(highlight)
+            val_dataset[i]['gradient_highlight']=highlight
+            
+            iou_f1 = iou_f1_score(str(highlight), str(obj['highlight']))
+            val_dataset[i]['gradient_based_iou_f1_score'] = iou_f1
+            token_f1 = token_f1_score(str(highlight), str(obj['highlight']))
+            val_dataset[i]['gradient_based_token_f1_score'] = token_f1
+
+        idx+=1
+        print (f"Example {idx} done")
+    out = os.path.join(args.output_dir, 'gradient_based_' + args.analysis_file)
+    with jsonlines.open(out, mode='w') as writer:
+        for item in val_dataset:
+            writer.write(item)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--analsis_dir', default='out', type=str, help='Directory where attribution figures will be saved')
     parser.add_argument('--model_checkpoint', type=str, default='microsoft/deberta-v3-base', help='model checkpoint')
-    parser.add_argument('--a1_analysis_file', type=str, default='out/analysis_data.jsonl', help='path to a1 analysis file')
+    parser.add_argument('--analysis_file', type=str, default='val_one_shot.jsonl', help='path to a1 analysis file')
     parser.add_argument('--num_labels', default=2, type=int, help='Task number of labels')
     parser.add_argument('--output_dir', default='out', type=str, help='Directory where model checkpoints will be saved')    
+    parser.add_argument('--cache_dir', type=str, help='Directory where cache will be saved')
     args = parser.parse_args()
     main(args)
