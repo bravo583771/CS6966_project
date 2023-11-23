@@ -26,32 +26,40 @@ def movie_rationales_llama2(args):
     #        nyc_data_train_two.append(obj)
 
     from transformers import AutoModelForCausalLM, AutoTokenizer
-    import torch
 
     print("Loading model")
-
-
     import transformers
     from transformers import AutoTokenizer
-    tokenizer = AutoTokenizer.from_pretrained(args.llama2_checkpoint, cache_dir = args.cache_dir)
-    model = AutoModelForCausalLM.from_pretrained(args.llama2_checkpoint, return_dict_in_generate=True)
-
-    pipeline = transformers.pipeline(
-        "text-generation",
-        model=args.llama2_checkpoint,
-        #cache_dir = args.cache_dir,
-        torch_dtype=torch.float16,
-        device_map="auto",
-    )
+    access_token = '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'
+    tokenizer = AutoTokenizer.from_pretrained(args.llama2_checkpoint, cache_dir = args.cache_dir, token=access_token)
+    model = AutoModelForCausalLM.from_pretrained(args.llama2_checkpoint, return_dict_in_generate=True, token=access_token)
 
     iou_f1_scores = []
     token_f1_scores = []
+
+    ##For Faithfulness##
+    #calculate Sufficiency & Comprehensiveness
+    input0_for_faithfulness = nyc_data_train_two[0]['input']
+    for highlight in nyc_data_train_two[0]['highlight']:
+        input0_for_faithfulness.replace(highlight, " ")
+
+    input1_for_faithfulness = nyc_data_train_two[1]['input']
+    for highlight in nyc_data_train_two[1]['highlight']:
+        input1_for_faithfulness.replace(highlight, " ")
+
 
     for i, val_inst in enumerate(nyc_data_five_val):         
         # ======================> ADD YOUR CODE TO DEFINE A PROMPT WITH TWO TRAIN EXAMPLES/DEMONSTRATIONS/SHOTS <======================
         label_train_0 = label4prompt(nyc_data_train_two[0]['target']) # 0 = negative, 1 = positive
         label_train_1 = label4prompt(nyc_data_train_two[1]['target']) # 0 = negative, 1 = positive
         
+        """
+        ##For Faithfulness##
+        val_input_for_faithfulness = val_inst['input']
+        for highlight in val_input_for_faithfulness['highlight']:
+            val_input_for_faithfulness.replace(highlight, "")
+        """
+
         if args.prompt == "two_shot":
             '''
             #1: 0.21913117277650862 for 5 val instances
@@ -77,7 +85,17 @@ def movie_rationales_llama2(args):
                             " the important phrases are " + str(nyc_data_train_two[1]['highlight']) + "</s><s>[INST]" +\
                                 "According to the above two examples, please answer whether the movie review is positive or negative and then list the important phrases. Format your response starting with either 'the review is positive' or 'the review is negative." +\
                                     val_inst['input'] + "[/INST]"              
-                
+            
+            """
+            prompt_for faithfulness =  "<s>[INST] Please answer whether the movie review is positive or negative and then list the important phrases." +\
+                input0_for_faithfulness + "[/INST]" + label_train_0 +\
+                    " the important phrases are " + str(nyc_data_train_two[0]['highlight']) + "</s><s>[INST]" +\
+                        "Please answer whether the movie review is positive or negative and then list the important phrases." +\
+                          input1_for_faithfulness + "[/INST]"  + label_train_1 +\
+                            " the important phrases are " + str(nyc_data_train_two[1]['highlight']) + "</s><s>[INST]" +\
+                                "According to the above two examples, please answer whether the movie review is positive or negative and then list the important phrases. Format your response starting with either 'the review is positive' or 'the review is negative." +\
+                                    val_input_for_faithfulness + "[/INST]"    
+            """
                      
         elif args.prompt == "one_shot":
 
@@ -91,6 +109,13 @@ def movie_rationales_llama2(args):
                         "According to the above example, please answer whether the movie review is positive or negative and then report important phrases to explain the reason. Format your response starting with either 'the review is positive' or 'the review is negative." +\
                             val_inst['input'] + "[/INST]"                
             
+            """
+            prompt_for faithfulness =  "<s>[INST] Please answer whether the movie review is positive or negative and then list the important phrases." +\
+                input0_for_faithfulness + "[/INST]" + label_train_0 +\
+                    " the important phrases are " + str(nyc_data_train_two[0]['highlight']) + "</s><s>[INST]" +\
+                        "According to the above two examples, please answer whether the movie review is positive or negative and then list the important phrases. Format your response starting with either 'the review is positive' or 'the review is negative." +\
+                            val_input_for_faithfulness + "[/INST]"    
+            """
 
         
             '''
@@ -113,51 +138,96 @@ def movie_rationales_llama2(args):
             #Average Token F1 Score: 0.23420844552028455 for 200 instances
 
             prompt =  "<s>[INST] Please answer whether the movie review is positive or negative and then report important phrases to explain the reason. Format your response starting with either 'the review is positive' or 'the review is negative." +\
-                            val_inst['input'] + "[/INST]"                
+                            val_inst['input'] + "[/INST]"  
+
+            """
+            prompt_for faithfulness =  "<s>[INST] Please answer whether the movie review is positive or negative and then report important phrases to explain the reason. Format your response starting with either 'the review is positive' or 'the review is negative." +\
+                            val_input_for_faithfulness + "[/INST]"    
+            """              
             
 
         max_token_limit = 4096
+        """
         sequences = pipeline(  # this will be the class "transformers.pipelines.text_generation"
             prompt,
             #return_tensors = True,
             return_text = True,
             #output_scores=True, 
-            # according to the source code, "transformers.pipelines.text_generation" does not output the score
+            # according to the source code, 
+            # seems like llama2 does not support returning score or probability values in "transformers.pipelines.text_generation" 
             # https://huggingface.co/transformers/v4.4.2/_modules/transformers/pipelines/text_generation.html
             do_sample = True,
             eos_token_id=tokenizer.eos_token_id,
             max_length=max_token_limit,
         )
+
+        """
+
+        #input_ids = tokenizer(prompt, return_tensors="pt")
+        input_ids = tokenizer(prompt, return_tensors="pt", padding=False, truncation=False).input_ids
+        with torch.no_grad():
+            generated_outputs = model.generate(input_ids,do_sample=True, num_return_sequences=1, output_scores=True, return_dict_in_generate=True,) 
+        print(generated_outputs)
         
-        gen_expl = sequences[0]['generated_text'].split("/INST]")[-1]
+        prob = torch.stack(generated_outputs.scores, dim=1).softmax(-1)
+        print(prob)
+        print(prob.shape)
+        max_values, max_idxs = torch.max(prob, dim=-1) 
+        """
+        #need the ids for negative and positive to compute faithfulness
+        """
+        
+        print(max_values.shape)
+        print(max_idxs.shape)
+        # -> shape [1, tokens_size, vocab_size]
+        generated_text = tokenizer.decode(generated_outputs[0][0], skip_special_tokens=True).split("/INST]")[-1]
+        print(generated_text)
+        tokenized_text = tokenizer.tokenize(generated_text)
+        for token, prob in zip(tokenized_text, max_values[0]):
+            print(f"Token: {token}, Prob: {prob.item()}")
 
-        nyc_data_five_val[i]['generated_llama2']=gen_expl
+        
+        """
+        ##For Faithfulness##
+        full_prompt_prob = 1
+        Mask_prompt_prob = 1
+        for i ,token in enumerate(tokenized_text):
+            if nyc_data_five_val[i]['target'] ==0:
+                goal = "negative"
+                idx = 
+            elif nyc_data_five_val[i]['target'] ==1:
+                goal = "positive"
+                idx = 
+            
+            if goal in token:
+                full_prompt_prob = prob[0,i,idx] #idx is the index of the positive/negative
+                break
+                
+        for i ,token in enumerate(mask_tokenized_text):
+            if nyc_data_five_val[i]['target'] ==0:
+                goal = "negative"
+                idx = 
+            elif nyc_data_five_val[i]['target'] ==1:
+                goal = "positive"
+                idx = 
+            
+            if goal in token:
+                Mask_prompt_prob = mask_prob[0,i,idx] #idx is the index of the positive/negative
+                break
+        
+        faithfulness = full_prompt_prob - Mask_prompt_prob
+        """
+        
 
-        DEVICE = torch.device('cpu')
-        #input_ids = torch.tensor(tokenizer.encode(prompt, add_special_tokens=False), device = DEVICE).unsqueeze(0)
-
-        input_ids = tokenizer(prompt, return_tensors="pt").input_ids
-        print(input_ids)
-        print(input_ids.shape)
-        generated_outputs = model.generate(input_ids, do_sample=True, num_return_sequences=3)  
-        print(generated_outputs)
-        print(generated_outputs.shape) 
-        generated_outputs = model.generate(input_ids, do_sample=True, num_return_sequences=3, output_scores=True)  
-        print(generated_outputs)
-        print(generated_outputs.shape) 
-        #seems like llama2 does not support returning score or probability values here
-        #probs = generated_outputs.softmax(-1)  # -> shape [3, vocab_size]
-        #print(probs)
-        ##Faithfulness##
-        #calculate Sufficiency & Comprehensiveness
 
         ##Plausibility##
         #calculate Intersection-over-Union (IOU) F1 anf Token F1
         label_val = label4prompt(nyc_data_five_val[i]['target']) # 0 = negative, 1 = positive
-        target_explanation = label_val + " the important phrases are " + str(nyc_data_five_val[i]['highlight'])
-        iou_f1 = iou_f1_score(gen_expl, target_explanation)
+        #target_explanation = label_val + " the important phrases are " + str(nyc_data_five_val[i]['highlight'])
+        target_explanation = label_val + " the important phrases are " + ' '.join(nyc_data_five_val[i]['highlight'])
+        iou_f1 = iou_f1_score(generated_text, target_explanation)
         nyc_data_five_val[i]['iou_f1_score'] = iou_f1
-        token_f1 = token_f1_score(gen_expl, target_explanation)
+        token_f1 = token_f1_score(generated_text, target_explanation)
         nyc_data_five_val[i]['token_f1_score'] = token_f1
 
         iou_f1_scores.append(iou_f1)
@@ -169,15 +239,15 @@ def movie_rationales_llama2(args):
     print("Average IOU F1 Score:", average_iou_f1)
     print("Average Token F1 Score:", average_token_f1)
 
-    filename = 'out/val_' + args.prompt + '.jsonl'
-    with jsonlines.open(filename, mode='w') as writer:
-        for item in nyc_data_five_val:
-            writer.write(item)
+    #filename = 'out/val_' + args.prompt + '.jsonl'
+    #with jsonlines.open(filename, mode='w') as writer:
+    #    for item in nyc_data_five_val:
+    #        writer.write(item)
 
-    filename = 'out/train.jsonl'
-    with jsonlines.open(filename, mode='w') as writer:
-        for item in nyc_data_train_two:
-            writer.write(item)
+    #filename = 'out/train.jsonl'
+    #with jsonlines.open(filename, mode='w') as writer:
+    #    for item in nyc_data_train_two:
+    #        writer.write(item)
 
 
 if __name__ == '__main__':
