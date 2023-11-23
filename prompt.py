@@ -5,6 +5,7 @@ import jsonlines
 import random 
 import os
 #from sklearn.metrics import f1_score
+import torch.nn.functional as F
 
 from util import *
 
@@ -30,9 +31,10 @@ def movie_rationales_llama2(args):
     print("Loading model")
     import transformers
     from transformers import AutoTokenizer
+
     access_token = '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'
     tokenizer = AutoTokenizer.from_pretrained(args.llama2_checkpoint, cache_dir = args.cache_dir, token=access_token)
-    model = AutoModelForCausalLM.from_pretrained(args.llama2_checkpoint, return_dict_in_generate=True, token=access_token)
+    model = AutoModelForCausalLM.from_pretrained(args.llama2_checkpoint, output_scores=True, return_dict_in_generate=True, token=access_token)
 
     iou_f1_scores = []
     token_f1_scores = []
@@ -106,7 +108,7 @@ def movie_rationales_llama2(args):
             prompt =  "<s>[INST] Please answer whether the movie review is positive or negative and then report important phrases to explain the reason." +\
                 nyc_data_train_two[0]['input'] + "[/INST]" + label_train_0 +\
                     " the important phrases are " + str(nyc_data_train_two[0]['highlight']) + "</s><s>[INST]" +\
-                        "According to the above example, please answer whether the movie review is positive or negative and then report important phrases to explain the reason. Format your response starting with either 'the review is positive' or 'the review is negative." +\
+                        "According to the above example, please answer whether the movie review is positive or negative and then list the important phrases. Format your response starting with either 'the review is positive' or 'the review is negative." +\
                             val_inst['input'] + "[/INST]"                
             
             """
@@ -137,7 +139,7 @@ def movie_rationales_llama2(args):
             #Average IOU F1 Score: 0.23420844552028455 for 200 instances
             #Average Token F1 Score: 0.23420844552028455 for 200 instances
 
-            prompt =  "<s>[INST] Please answer whether the movie review is positive or negative and then report important phrases to explain the reason. Format your response starting with either 'the review is positive' or 'the review is negative." +\
+            prompt =  "<s>[INST] Please answer whether the movie review is positive or negative and then list the important phrases. Format your response starting with either 'the review is positive' or 'the review is negative." +\
                             val_inst['input'] + "[/INST]"  
 
             """
@@ -145,9 +147,9 @@ def movie_rationales_llama2(args):
                             val_input_for_faithfulness + "[/INST]"    
             """              
             
-
-        max_token_limit = 4096
         """
+        max_token_limit = 4096
+        
         sequences = pipeline(  # this will be the class "transformers.pipelines.text_generation"
             prompt,
             #return_tensors = True,
@@ -163,6 +165,69 @@ def movie_rationales_llama2(args):
 
         """
 
+        input_ids = tokenizer.encode(prompt, return_tensors='pt')
+
+        # Generate text output
+        model_output = model.generate(
+            input_ids,
+            max_length=4096,
+            do_sample=True,
+            eos_token_id=tokenizer.eos_token_id
+        )
+
+        # Decode the generated token IDs to text
+        generated_text = tokenizer.decode(model_output[0], skip_special_tokens=True).split("/INST]")[-1]
+        #print(generated_text)
+        nyc_data_five_val[i]['generated_llama2']=generated_text
+
+        ####extract important phrases######
+
+        import jsonlines, re
+
+        data = []
+        pattern = r'\"([^\"]+)\"'
+
+        explanation_lines = generated_text.split('\n')
+        #print("Full Explanation:", explanation_lines)
+        #print("---------------------------")
+
+        important_phrases = []
+        for line in explanation_lines:
+            matches = re.findall(pattern, line)
+            for match in matches:
+                important_phrases.append(match)
+
+        #print("Important Phrases:", important_phrases)
+        #print("---------------------------")
+
+        data.append(important_phrases)
+
+
+        ####pred_prob####
+        with torch.no_grad():
+            generated_outputs = model(input_ids)
+        prob = F.softmax(generated_outputs.logits, dim=-1)
+        #print(prob)
+        #print(prob.shape)
+
+        max_values, max_idxs = torch.max(prob, dim=-1)
+        #print(max_values.shape)
+        #print(max_idxs.shape)
+
+        tokenized_text = tokenizer.tokenize(generated_text)
+        for token, prob in zip(tokenized_text, max_values[0]):
+            #print(f"Token: {token}, Prob: {prob.item()}")
+
+            if  token == "▁positive":
+                print(f"Token: {token}, Prob: {prob.item()}")
+                break
+
+            if  token == "▁negative":
+                print(f"Token: {token}, Prob: {prob.item()}")
+                break
+
+
+        '''
         #input_ids = tokenizer(prompt, return_tensors="pt")
         input_ids = tokenizer(prompt, return_tensors="pt", padding=False, truncation=False).input_ids
         with torch.no_grad():
@@ -172,19 +237,15 @@ def movie_rationales_llama2(args):
         prob = torch.stack(generated_outputs.scores, dim=1).softmax(-1)
         print(prob)
         print(prob.shape)
-        max_values, max_idxs = torch.max(prob, dim=-1) 
-        """
-        #need the ids for negative and positive to compute faithfulness
-        """
-        
-        print(max_values.shape)
-        print(max_idxs.shape)
+        max_values, max_idxs = torch.max(prob, dim=-1)         
+
         # -> shape [1, tokens_size, vocab_size]
         generated_text = tokenizer.decode(generated_outputs[0][0], skip_special_tokens=True).split("/INST]")[-1]
         print(generated_text)
         tokenized_text = tokenizer.tokenize(generated_text)
         for token, prob in zip(tokenized_text, max_values[0]):
             print(f"Token: {token}, Prob: {prob.item()}")
+        '''
 
         
         """
@@ -239,15 +300,15 @@ def movie_rationales_llama2(args):
     print("Average IOU F1 Score:", average_iou_f1)
     print("Average Token F1 Score:", average_token_f1)
 
-    #filename = 'out/val_' + args.prompt + '.jsonl'
-    #with jsonlines.open(filename, mode='w') as writer:
-    #    for item in nyc_data_five_val:
-    #        writer.write(item)
+    filename = 'out/val_' + args.prompt + '.jsonl'
+    with jsonlines.open(filename, mode='w') as writer:
+        for item in nyc_data_five_val:
+            writer.write(item)
 
-    #filename = 'out/train.jsonl'
-    #with jsonlines.open(filename, mode='w') as writer:
-    #    for item in nyc_data_train_two:
-    #        writer.write(item)
+    filename = 'out/train.jsonl'
+    with jsonlines.open(filename, mode='w') as writer:
+        for item in nyc_data_train_two:
+            writer.write(item)
 
 
 if __name__ == '__main__':
@@ -258,7 +319,7 @@ if __name__ == '__main__':
     parser.add_argument('--task_name', default="movie_rationales",  type=str, help='Name of the task that will be used by huggingface load dataset')    
     #parser.add_argument('--subtask', default="explanation", type=str, help="The contest has three subtasks: matching, ranking, explanation")
     parser.add_argument('--llama2_checkpoint', default="meta-llama/Llama-2-7b-chat-hf", type=str, help="The hf name of a llama2 checkpoint")
-    parser.add_argument('--val_size', default=200, type=int, help="The sample size of validation dataset.")
+    parser.add_argument('--val_size', default=5, type=int, help="The sample size of validation dataset.")
     parser.add_argument('--prompt', default="one_shot", type=str, help="Control the type of prompt.")
     args = parser.parse_args()
     if args.prompt not in ["zero_shot", "one_shot", "two_shot"]:
