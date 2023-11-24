@@ -16,7 +16,7 @@ from transformers import AutoModelForSequenceClassification
 from captum.attr import LayerIntegratedGradients, TokenReferenceBase
 
 import matplotlib.pyplot as plt
-
+import re
 import argparse 
 import jsonlines
 import os 
@@ -100,6 +100,7 @@ class ExplainableTransformerPipeline():
 def main(args):
     tokenizer = AutoTokenizer.from_pretrained(args.model_checkpoint, cache_dir = args.cache_dir) 
     model = AutoModelForSequenceClassification.from_pretrained(args.model_checkpoint, num_labels=args.num_labels, cache_dir = args.cache_dir)
+
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     clf = transformers.pipeline("text-classification", 
@@ -123,15 +124,33 @@ def main(args):
             for highlight in obj["highlight"]:
                 len_highlight += len(highlight)
             proportion = len_highlight/len(obj["input"])
-            #exp_model.explain(obj["input"], os.path.join(args.output_dir,f'example_{idx}'))
-            highlight = exp_model.explain(obj["input"], os.path.join(args.output_dir,f'example_{idx}'), proportion)
-            print(highlight)
+            raw_highlight = exp_model.explain(obj["input"], os.path.join(args.output_dir,f'example_{idx}'),len_highlight)
+            print("raw_highlight", raw_highlight)
+            cleaned_highlight = [token.replace('▁', '') for token in raw_highlight if re.search('[a-zA-Z]', token)]
+            print("cleaned_highlight", cleaned_highlight)
+
+            final_highlight = []
+            current_len_highlight = 0
+            for token in cleaned_highlight:
+                if current_len_highlight + len(token) > len_highlight:
+                    break
+                final_highlight.append(token)
+                current_len_highlight += len(token)
+
+            print("final_highlight",final_highlight)
+            print(obj['highlight'])
+            #highlight = exp_model.explain(obj["input"], os.path.join(args.output_dir,f'example_{idx}'), proportion)
+            #print("highlight",highlight)
+
             val_dataset[i]['gradient_highlight']=highlight
+            print(str(final_highlight), str(obj['highlight']))
             
-            iou_f1 = iou_f1_score(str(highlight), str(obj['highlight']))
+            iou_f1 = iou_f1_score(str(final_highlight), str(obj['highlight']))
             val_dataset[i]['gradient_based_iou_f1_score'] = iou_f1
-            token_f1 = token_f1_score(str(highlight), str(obj['highlight']))
+            token_f1 = token_f1_score(str(final_highlight), str(obj['highlight']))
             val_dataset[i]['gradient_based_token_f1_score'] = token_f1
+            print("iou_f1",iou_f1)
+            print("token_f1",token_f1)
 
         idx+=1
         print (f"Example {idx} done")
@@ -145,6 +164,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--analsis_dir', default='out', type=str, help='Directory where attribution figures will be saved')
     parser.add_argument('--model_checkpoint', type=str, default='microsoft/deberta-v3-base', help='model checkpoint')
+    #parser.add_argument('--model_checkpoint', type=str, default='llama2', help='model checkpoint')
     parser.add_argument('--analysis_file', type=str, default='val_one_shot.jsonl', help='path to a1 analysis file')
     parser.add_argument('--num_labels', default=2, type=int, help='Task number of labels')
     parser.add_argument('--output_dir', default='out', type=str, help='Directory where model checkpoints will be saved')    
