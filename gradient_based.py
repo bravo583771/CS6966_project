@@ -64,7 +64,8 @@ class ExplainableTransformerPipeline():
         
         k = round(proportion * len(attr.cpu().numpy()[0][::-1]))
         index = np.argsort(np.absolute(attr.cpu().numpy()[0][::-1]))[:k]
-        return np.array(self.__pipeline.tokenizer.convert_ids_to_tokens(inputs.detach().cpu().numpy()[0])[::-1])[index].tolist()
+        tokens = np.array(self.__pipeline.tokenizer.convert_ids_to_tokens(inputs.detach().cpu().numpy()[0])[::-1]).tolist()
+        return np.array([token.replace('▁', '') for token in tokens if re.search('[a-zA-Z]', token)])[index].tolist()
                       
     def explain(self, text: str, outfile_path: str, proportion: float):
         """
@@ -132,24 +133,8 @@ def main(args):
             len_highlight = 0
             for highlight in obj["highlight"]:
                 len_highlight += len(highlight)
-            #proportion = len_highlight/len(obj["input"])
-            raw_highlight = exp_model.explain(obj["input"], os.path.join(args.output_dir,f'example_{idx}'),len_highlight)
-            #print("raw_highlight", raw_highlight)
-            cleaned_highlight = [token.replace('▁', '') for token in raw_highlight if re.search('[a-zA-Z]', token)]
-            #print("cleaned_highlight", cleaned_highlight)
-
-            final_highlight = []
-            current_len_highlight = 0
-            for token in cleaned_highlight:
-                if current_len_highlight + len(token) > len_highlight:
-                    break
-                final_highlight.append(token)
-                current_len_highlight += len(token)
-
-            #print("final_highlight",final_highlight)
-
-            #highlight = exp_model.explain(obj["input"], os.path.join(args.output_dir,f'example_{idx}'), proportion)
-            #print("highlight",highlight)
+            proportion = len_highlight/len(obj["input"])
+            final_highlight = exp_model.explain(obj["input"], os.path.join(args.output_dir,f'example_{idx}'),proportion)
 
             val_dataset[i]['gradient_highlight']=final_highlight
 
@@ -157,10 +142,11 @@ def main(args):
 
             print(str(final_highlight), str(target_labels))
 
-            iou_f1 = iou_f1_score(str(final_highlight), str(target_labels))
+            iou_f1 = iou_f1_score(' '.join(final_highlight), ' '.join(target_labels))
             val_dataset[i]['gradient_based_iou_f1_score'] = iou_f1
-            token_f1 = token_f1_score(str(final_highlight), str(target_labels))
+            token_f1 = token_f1_score(' '.join(final_highlight).replace("_", ""), ' '.join(target_labels))
             val_dataset[i]['gradient_based_token_f1_score'] = token_f1
+
             print("iou_f1",iou_f1)
             print("token_f1",token_f1)
 
