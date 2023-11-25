@@ -101,6 +101,11 @@ def main(args):
     tokenizer = AutoTokenizer.from_pretrained(args.model_checkpoint, cache_dir = args.cache_dir) 
     model = AutoModelForSequenceClassification.from_pretrained(args.model_checkpoint, num_labels=args.num_labels, cache_dir = args.cache_dir)
 
+    #access_token = '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'
+    #tokenizer = AutoTokenizer.from_pretrained(args.model_checkpoint, cache_dir = args.cache_dir, token=access_token)
+    #model = AutoModelForSequenceClassification.from_pretrained(args.model_checkpoint, num_labels=args.num_labels, cache_dir = args.cache_dir, token=access_token)
+
+
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     clf = transformers.pipeline("text-classification", 
@@ -117,17 +122,21 @@ def main(args):
         for obj in reader:
             val_dataset.append(obj)
 
+
+    iou_f1_scores = []
+    token_f1_scores = []
+
     for i, obj in enumerate(val_dataset):
         print("The length of the review: {}.".format(len(obj["input"])))
         if len(obj["input"])<=3900: # avoiding cuda out of memory
             len_highlight = 0
             for highlight in obj["highlight"]:
                 len_highlight += len(highlight)
-            proportion = len_highlight/len(obj["input"])
+            #proportion = len_highlight/len(obj["input"])
             raw_highlight = exp_model.explain(obj["input"], os.path.join(args.output_dir,f'example_{idx}'),len_highlight)
-            print("raw_highlight", raw_highlight)
+            #print("raw_highlight", raw_highlight)
             cleaned_highlight = [token.replace('▁', '') for token in raw_highlight if re.search('[a-zA-Z]', token)]
-            print("cleaned_highlight", cleaned_highlight)
+            #print("cleaned_highlight", cleaned_highlight)
 
             final_highlight = []
             current_len_highlight = 0
@@ -137,23 +146,37 @@ def main(args):
                 final_highlight.append(token)
                 current_len_highlight += len(token)
 
-            print("final_highlight",final_highlight)
-            print(obj['highlight'])
+            #print("final_highlight",final_highlight)
+
             #highlight = exp_model.explain(obj["input"], os.path.join(args.output_dir,f'example_{idx}'), proportion)
             #print("highlight",highlight)
 
-            val_dataset[i]['gradient_highlight']=highlight
-            print(str(final_highlight), str(obj['highlight']))
-            
-            iou_f1 = iou_f1_score(str(final_highlight), str(obj['highlight']))
+            val_dataset[i]['gradient_highlight']=final_highlight
+
+            target_labels = [word for label in obj['highlight'] for word in label.split() if word.isalpha()]
+
+            print(str(final_highlight), str(target_labels))
+
+            iou_f1 = iou_f1_score(str(final_highlight), str(target_labels))
             val_dataset[i]['gradient_based_iou_f1_score'] = iou_f1
-            token_f1 = token_f1_score(str(final_highlight), str(obj['highlight']))
+            token_f1 = token_f1_score(str(final_highlight), str(target_labels))
             val_dataset[i]['gradient_based_token_f1_score'] = token_f1
             print("iou_f1",iou_f1)
             print("token_f1",token_f1)
 
+            iou_f1_scores.append(iou_f1)
+            token_f1_scores.append(token_f1)
+
         idx+=1
         print (f"Example {idx} done")
+
+    average_iou_f1 = sum(iou_f1_scores) / len(iou_f1_scores)
+    average_token_f1 = sum(token_f1_scores) / len(token_f1_scores)
+    #Average IOU F1 Score (microsoft/deberta-v3-base): 0.16736708383759458
+    #Average Token F1 Score (microsoft/deberta-v3-base): 0.16736708383759458
+    print("Average IOU F1 Score:", average_iou_f1)
+    print("Average Token F1 Score:", average_token_f1)
+
     out = os.path.join(args.output_dir, 'gradient_based_' + args.analysis_file)
     with jsonlines.open(out, mode='w') as writer:
         for item in val_dataset:
@@ -164,7 +187,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--analsis_dir', default='out', type=str, help='Directory where attribution figures will be saved')
     parser.add_argument('--model_checkpoint', type=str, default='microsoft/deberta-v3-base', help='model checkpoint')
-    #parser.add_argument('--model_checkpoint', type=str, default='llama2', help='model checkpoint')
+    #parser.add_argument('--model_checkpoint', type=str, default='meta-llama/Llama-2-7b-chat-hf', help='model checkpoint')
     parser.add_argument('--analysis_file', type=str, default='val_one_shot.jsonl', help='path to a1 analysis file')
     parser.add_argument('--num_labels', default=2, type=int, help='Task number of labels')
     parser.add_argument('--output_dir', default='out', type=str, help='Directory where model checkpoints will be saved')    
