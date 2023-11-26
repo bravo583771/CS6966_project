@@ -58,31 +58,47 @@ def movie_rationales_llama2(args):
     input0_for_comprehensiveness = nyc_data_train_two[0]['input']
     input0_for_sufficiency = "   "
     for highlight in nyc_data_train_two[0]['highlight']:
-        input0_for_comprehensiveness.replace(highlight, "  ")
+        input0_for_comprehensiveness = input0_for_comprehensiveness.replace(highlight, "  ")
         input0_for_sufficiency += (highlight + "   ")
 
     input1_for_comprehensiveness = nyc_data_train_two[1]['input']
     input1_for_sufficiency = "   "
     for highlight in nyc_data_train_two[1]['highlight']:
-        input1_for_comprehensiveness.replace(highlight, "  ")
+        input0_for_comprehensiveness = input1_for_comprehensiveness.replace(highlight, "  ")
         input1_for_sufficiency += (highlight + "   ")
     ##=====================================## 
 
+    
+    start_item = 0
+    """
+    #This is for continous running in different jobs
+    filename = 'out/val_' + args.prompt + '.jsonl'
+    
+    if os.path.isfile(filename):
+        with jsonlines.open(filename) as reader:
+            for i, item in enumerate(reader):
+                if nyc_data_val[i]["input"]==item["input"] and len(set(['comprehensiveness', 'sufficiency', 'iou_f1_score', 'token_f1_score']).intersection(item.keys()))==4:
+                    nyc_data_val[i] = item
+                    start_item = i+1
+                    iou_f1_scores.append(item['iou_f1_score'])
+                    token_f1_scores.append(item['token_f1_score'])
+                    comprehensiveness_list.append(item['comprehensiveness'])
+                    sufficiency_list.append(item['sufficiency'])
+                else:
+                    break
+    """
+    count = 0 
     for i, val_inst in enumerate(nyc_data_val):       
-        if i >= args.val_size:
-            break  
+        if i < start_item:
+            continue
+        else:
+            if count >= args.val_size:
+                break
+            count += 1  
         # ======================> ADD YOUR CODE TO DEFINE A PROMPT WITH TWO TRAIN EXAMPLES/DEMONSTRATIONS/SHOTS <======================
         label_train_0 = label4prompt(nyc_data_train_two[0]['target']) # 0 = negative, 1 = positive
         label_train_1 = label4prompt(nyc_data_train_two[1]['target']) # 0 = negative, 1 = positive
         
-        ##=====================================## 
-        ##for comprehensiveness and sufficiency##
-        val_input_for_comprehensiveness = val_inst['input']
-        val_input_for_sufficiency = "   "
-        for highlight in val_inst['highlight']:
-            val_input_for_comprehensiveness.replace(highlight, "")
-            val_input_for_sufficiency += (highlight + "   ")
-        ##=====================================## 
 
         if args.prompt == "two_shot":
             '''
@@ -97,7 +113,6 @@ def movie_rationales_llama2(args):
                                 "According to the above two examples, please use yes or no to answer whether the movie review is positive or not and then list important phrases" +\
                                     val_inst['input'] + "[/INST]"           
             '''
-
             
             #Average IOU F1 Score: 0.24472592482987424 for 200 instances
             #Average Token F1 Score: 0.24472592482987424 for 200 instances
@@ -109,27 +124,6 @@ def movie_rationales_llama2(args):
                             " the important phrases are " + str(nyc_data_train_two[1]['highlight']) + "</s><s>[INST]" +\
                                 "According to the above two examples, please answer whether the movie review is positive or negative and then list the important phrases. Format your response starting with either 'the review is positive' or 'the review is negative." +\
                                     val_inst['input'] + "[/INST]"              
-            
-            ##=====================================## 
-            ##for comprehensiveness and sufficiency##
-            prompt_for_comprehensiveness =  "<s>[INST] Please answer whether the movie review is positive or negative and then list the important phrases." +\
-                input0_for_comprehensiveness + "[/INST]" + label_train_0 +\
-                    " the important phrases are " + str(nyc_data_train_two[0]['highlight']) + "</s><s>[INST]" +\
-                        "Please answer whether the movie review is positive or negative and then list the important phrases." +\
-                          input1_for_comprehensiveness + "[/INST]"  + label_train_1 +\
-                            " the important phrases are " + str(nyc_data_train_two[1]['highlight']) + "</s><s>[INST]" +\
-                                "According to the above two examples, please answer whether the movie review is positive or negative and then list the important phrases. Format your response starting with either 'the review is positive' or 'the review is negative." +\
-                                    val_input_for_comprehensiveness + "[/INST]"    
-            
-            prompt_for_sufficiency =  "<s>[INST] Please answer whether the movie review is positive or negative and then list the important phrases." +\
-                input0_for_sufficiency + "[/INST]" + label_train_0 +\
-                    " the important phrases are " + str(nyc_data_train_two[0]['highlight']) + "</s><s>[INST]" +\
-                        "Please answer whether the movie review is positive or negative and then list the important phrases." +\
-                          input1_for_sufficiency + "[/INST]"  + label_train_1 +\
-                            " the important phrases are " + str(nyc_data_train_two[1]['highlight']) + "</s><s>[INST]" +\
-                                "According to the above two examples, please answer whether the movie review is positive or negative and then list the important phrases. Format your response starting with either 'the review is positive' or 'the review is negative." +\
-                                    val_input_for_sufficiency + "[/INST]"  
-            ##=====================================## 
                      
         elif args.prompt == "one_shot":
 
@@ -140,23 +134,8 @@ def movie_rationales_llama2(args):
             prompt =  "<s>[INST] Please answer whether the movie review is positive or negative and then report important phrases to explain the reason." +\
                 nyc_data_train_two[0]['input'] + "[/INST]" + label_train_0 +\
                     " the important phrases are " + str(nyc_data_train_two[0]['highlight']) + "</s><s>[INST]" +\
-                        "According to the above example, please answer whether the movie review is positive or negative and then list the important phrases. Format your response starting with either 'the review is positive' or 'the review is negative." +\
+                        "According to the above example, please answer whether the movie review is positive or negative and then list the important phrases. Format the response starting with either 'the review is positive' or 'the review is negative. Again, the response should start with either 'the review is positive' or 'the review is negative." +\
                             val_inst['input'] + "[/INST]"                
-            
-            ##=====================================## 
-            ##for comprehensiveness and sufficiency##
-            prompt_for_comprehensiveness =  "<s>[INST] Please answer whether the movie review is positive or negative and then list the important phrases." +\
-                input0_for_comprehensiveness + "[/INST]" + label_train_0 +\
-                    " the important phrases are " + str(nyc_data_train_two[0]['highlight']) + "</s><s>[INST]" +\
-                        "According to the above two examples, please answer whether the movie review is positive or negative and then list the important phrases. Format your response starting with either 'the review is positive' or 'the review is negative." +\
-                            val_input_for_comprehensiveness + "[/INST]"   
-            
-            prompt_for_sufficiency =  "<s>[INST] Please answer whether the movie review is positive or negative and then list the important phrases." +\
-                input0_for_sufficiency + "[/INST]" + label_train_0 +\
-                    " the important phrases are " + str(nyc_data_train_two[0]['highlight']) + "</s><s>[INST]" +\
-                        "According to the above two examples, please answer whether the movie review is positive or negative and then list the important phrases. Format your response starting with either 'the review is positive' or 'the review is negative." +\
-                            val_input_for_sufficiency + "[/INST]"   
-            ##=====================================## 
         
             '''
             #2: 0.21088923922994768 for 5 val instances
@@ -179,15 +158,6 @@ def movie_rationales_llama2(args):
 
             prompt =  "<s>[INST] Please answer whether the movie review is positive or negative and then list the important phrases. Format your response starting with either 'the review is positive' or 'the review is negative." +\
                             val_inst['input'] + "[/INST]"  
-
-            ##=====================================## 
-            ##for comprehensiveness and sufficiency##
-            prompt_for_comprehensiveness =  "<s>[INST] Please answer whether the movie review is positive or negative and then report important phrases to explain the reason. Format your response starting with either 'the review is positive' or 'the review is negative." +\
-                            val_input_for_comprehensiveness + "[/INST]"    
-            
-            prompt_for_sufficiency  =  "<s>[INST] Please answer whether the movie review is positive or negative and then report important phrases to explain the reason. Format your response starting with either 'the review is positive' or 'the review is negative." +\
-                            val_input_for_sufficiency  + "[/INST]"    
-            ##=====================================##                           
             
         """
         max_token_limit = 4096
@@ -209,9 +179,6 @@ def movie_rationales_llama2(args):
 
         input_ids = tokenizer.encode(prompt, return_tensors='pt', add_special_tokens=False)
 
-        input_ids_comprehensiveness = tokenizer.encode(prompt_for_comprehensiveness, return_tensors='pt', add_special_tokens=False)
-        input_ids_sufficiency = tokenizer.encode(prompt_for_sufficiency, return_tensors='pt', add_special_tokens=False)
-
         # Generate text output
         model_output = model.generate(
             input_ids,
@@ -221,114 +188,14 @@ def movie_rationales_llama2(args):
             return_dict_in_generate=True,
             do_sample=True,
             #eos_token_id=tokenizer.eos_token_id,
-        )
-
-        ##=====================================## 
-        ##for comprehensiveness and sufficiency##
-        model_output_comprehensiveness = model.generate(
-            input_ids_comprehensiveness,
-            max_length=4096,
-            num_return_sequences=1, 
-            output_scores=True, 
-            return_dict_in_generate=True,
-            do_sample=True,
-            #eos_token_id=tokenizer.eos_token_id,
-        )
-        model_output_sufficiency = model.generate(
-            input_ids_sufficiency,
-            max_length=4096,
-            num_return_sequences=1, 
-            output_scores=True, 
-            return_dict_in_generate=True,
-            do_sample=True,
-            #eos_token_id=tokenizer.eos_token_id,
-        )
-        ##=====================================## 
-        
+        )        
 
         # Decode the generated token IDs to text
         #generated_text = tokenizer.decode(model_output[0], skip_special_tokens=True).split("/INST]")[-1]
         generated_text = tokenizer.decode(model_output[0][0], skip_special_tokens=True).split("/INST]")[-1]
-
-        ##=====================================## 
-        ##for comprehensiveness and sufficiency##
-        generated_text_comprehensiveness = tokenizer.decode(model_output_comprehensiveness[0][0], skip_special_tokens=True).split("/INST]")[-1]
-        generated_text_sufficiency = tokenizer.decode(model_output_sufficiency[0][0], skip_special_tokens=True).split("/INST]")[-1]
-        ##=====================================## 
-
-
-        #print(generated_text)
-        nyc_data_val[i]['generated_llama2']=generated_text
-
-        ####pred_prob####
-        #print(f"scores: {model_output.scores}") # too many -inf, leads to predict 1.0 for the predicted word
-        score = torch.stack(model_output.scores, dim=1)
-        probs = torch.maximum(score, torch.zeros_like(score)).softmax(-1)
-        max_values, max_idxs = torch.max(probs, dim=-1)
-        #print(f"max_values.shape: {max_values.shape}")
-        #print(f"max_idxs.shape: {max_idxs.shape}")
-
-
-        ##=====================================## 
-        ##for comprehensiveness and sufficiency##
-        score = torch.stack(model_output_comprehensiveness.scores, dim=1)
-        probs_comprehensiveness = torch.maximum(score, torch.zeros_like(score)).softmax(-1)
-        score = torch.stack(model_output_sufficiency.scores, dim=1)
-        probs_sufficiency = torch.maximum(score, torch.zeros_like(score)).softmax(-1)
-        ##=====================================## 
-
-
-        tokenized_text = tokenizer.tokenize(generated_text)
-        tokenized_text_comprehensiveness = tokenizer.tokenize(generated_text_comprehensiveness)
-        tokenized_text_sufficiency = tokenizer.tokenize(generated_text_sufficiency)
-        for token, prob, word_id in zip(tokenized_text, max_values[0], max_idxs[0]):
-            if  "positive" in token:
-                print(f"Token: {token}, Prob: {prob.item()}, Word_id: {word_id.item()}") #word_id = 6374
-                break
-
-            if  "negative" in token:
-                print(f"Token: {token}, Prob: {prob.item()}, Word_id: {word_id.item()}") #word_id = 8178
-                break
-    
-        ##=====================================## 
-        ##For Faithfulness##
-        ##for comprehensiveness and sufficiency##
-        full_prompt_prob = 1
-        Mask_prompt_prob_comprehensiveness = 1
-        Mask_prompt_prob_sufficiency = 1
-
-        for j ,token in enumerate(tokenized_text): #the format is like "The review is positive...", the first positive/negative should be the label.
-            if "negative" in token:
-                goal = "negative"
-                idx = 8178
-                full_prompt_prob = probs[0,j,idx] #idx is the index of the positive/negative
-                break
-            elif "positive" in token:
-                goal = "positive"
-                idx = 6374
-                full_prompt_prob = probs[0,j,idx] #idx is the index of the positive/negative
-                break
-        
-        #comprehensiveness
-        for j ,token in enumerate(tokenized_text_comprehensiveness):            
-            if goal in token:
-                Mask_prompt_prob_comprehensiveness = probs_comprehensiveness[0,j,idx] #idx is the index of the positive/negative
-                break
-        
-        comprehensiveness = full_prompt_prob - Mask_prompt_prob_comprehensiveness if full_prompt_prob > Mask_prompt_prob_comprehensiveness else 0
-
-        #sufficiency
-        for j ,token in enumerate(tokenized_text_sufficiency):            
-            if goal in token:
-                Mask_prompt_prob_sufficiency = probs_sufficiency[0,j,idx] #idx is the index of the positive/negative
-                break
-        
-        sufficiency = full_prompt_prob - Mask_prompt_prob_sufficiency if full_prompt_prob > Mask_prompt_prob_sufficiency else 0
-        ##=====================================## 
-        comprehensiveness_list.append(comprehensiveness)
-        sufficiency_list.append(sufficiency)
-        nyc_data_val[i]['comprehensiveness'] = comprehensiveness
-        nyc_data_val[i]['sufficiency'] = sufficiency
+        generated_text = generated_text.strip()
+        print("generated_text",generated_text)
+        print("--------------")
 
         ####extract important phrases######
         data = []
@@ -336,7 +203,7 @@ def movie_rationales_llama2(args):
 
         explanation_lines = generated_text.split('\n')
         print("Full Explanation:", explanation_lines)
-        print("---------------------------")
+        print("---------------------------")    
 
         important_phrases = []
         for line in explanation_lines:
@@ -361,6 +228,202 @@ def movie_rationales_llama2(args):
         iou_f1_scores.append(iou_f1)
         token_f1_scores.append(token_f1)
         #print("Instance {} done.".format(i))
+
+
+        ##=====================================## 
+        ##for comprehensiveness and sufficiency##
+        val_input_for_comprehensiveness = val_inst['input']
+        val_input_for_sufficiency = ""
+        for highlight in important_phrases:
+            val_input_for_comprehensiveness = val_input_for_comprehensiveness.replace(highlight, "   ")
+            val_input_for_sufficiency += (highlight + "   ")
+        
+        print("val_input_for_comprehensiveness: ", val_input_for_comprehensiveness)
+        print("val_input_for_sufficiency: ", val_input_for_sufficiency)
+
+        if args.prompt == "two_shot":
+
+            ##=====================================## 
+            ##for comprehensiveness and sufficiency##
+            prompt_for_comprehensiveness =  "<s>[INST] Please answer whether the movie review is positive or negative and then list the important phrases." +\
+                input0_for_comprehensiveness + "[/INST]" + label_train_0 +\
+                    " the important phrases are " + str(nyc_data_train_two[0]['highlight']) + "</s><s>[INST]" +\
+                        "Please answer whether the movie review is positive or negative and then list the important phrases." +\
+                          input1_for_comprehensiveness + "[/INST]"  + label_train_1 +\
+                            " the important phrases are " + str(nyc_data_train_two[1]['highlight']) + "</s><s>[INST]" +\
+                                "According to the above two examples, please answer whether the movie review is positive or negative and then list the important phrases. Format your response starting with either 'the review is positive' or 'the review is negative." +\
+                                    val_input_for_comprehensiveness + "[/INST]"    
+            
+            prompt_for_sufficiency =  "<s>[INST] Please answer whether the movie review is positive or negative and then list the important phrases." +\
+                input0_for_sufficiency + "[/INST]" + label_train_0 +\
+                    " the important phrases are " + str(nyc_data_train_two[0]['highlight']) + "</s><s>[INST]" +\
+                        "Please answer whether the movie review is positive or negative and then list the important phrases." +\
+                          input1_for_sufficiency + "[/INST]"  + label_train_1 +\
+                            " the important phrases are " + str(nyc_data_train_two[1]['highlight']) + "</s><s>[INST]" +\
+                                "According to the above two examples, please answer whether the movie review is positive or negative and then list the important phrases. Format your response starting with either 'the review is positive' or 'the review is negative. Again, the response should start with either 'the review is positive' or 'the review is negative." +\
+                                    val_input_for_sufficiency + "[/INST]"  
+            ##=====================================## 
+                     
+        elif args.prompt == "one_shot":
+
+            ##=====================================## 
+            ##for comprehensiveness and sufficiency##
+            prompt_for_comprehensiveness =  "<s>[INST] Please answer whether the movie review is positive or negative and then list the important phrases." +\
+                input0_for_comprehensiveness + "[/INST]" + label_train_0 +\
+                    " the important phrases are " + str(nyc_data_train_two[0]['highlight']) + "</s><s>[INST]" +\
+                        "According to the above two examples, please answer whether the movie review is positive or negative and then list the important phrases. Format the response starting with either 'the review is positive' or 'the review is negative. Again, the response should start with either 'the review is positive' or 'the review is negative." +\
+                            val_input_for_comprehensiveness + "[/INST]"   
+            
+            prompt_for_sufficiency =  "<s>[INST] Please answer whether the movie review is positive or negative and then list the important phrases." +\
+                input0_for_sufficiency + "[/INST]" + label_train_0 +\
+                    " the important phrases are " + str(nyc_data_train_two[0]['highlight']) + "</s><s>[INST]" +\
+                        "According to the above two examples, please answer whether the movie review is positive or negative and then list the important phrases. Format the response starting with either 'the review is positive' or 'the review is negative." +\
+                            val_input_for_sufficiency + "[/INST]"   
+            ##=====================================## 
+
+        elif args.prompt == "zero_shot":
+
+            ##=====================================## 
+            ##for comprehensiveness and sufficiency##
+            prompt_for_comprehensiveness =  "<s>[INST] Please answer whether the movie review is positive or negative and then report important phrases to explain the reason. Format your response starting with either 'the review is positive' or 'the review is negative." +\
+                            val_input_for_comprehensiveness + "[/INST]"    
+            
+            prompt_for_sufficiency  =  "<s>[INST] Please answer whether the movie review is positive or negative and then report important phrases to explain the reason. Format your response starting with either 'the review is positive' or 'the review is negative." +\
+                            val_input_for_sufficiency  + "[/INST]"    
+            ##=====================================##      
+
+        ##=====================================## 
+        ##for comprehensiveness and sufficiency##
+        input_ids_comprehensiveness = tokenizer.encode(prompt_for_comprehensiveness, return_tensors='pt', add_special_tokens=False)
+        input_ids_sufficiency = tokenizer.encode(prompt_for_sufficiency, return_tensors='pt', add_special_tokens=False)
+
+        model_output_comprehensiveness = model.generate(
+            input_ids_comprehensiveness,
+            max_length=4096,
+            num_return_sequences=1, 
+            output_scores=True, 
+            return_dict_in_generate=True,
+            do_sample=True,
+            #eos_token_id=tokenizer.eos_token_id,
+        )
+        model_output_sufficiency = model.generate(
+            input_ids_sufficiency,
+            max_length=4096,
+            num_return_sequences=1, 
+            output_scores=True, 
+            return_dict_in_generate=True,
+            do_sample=True,
+            #eos_token_id=tokenizer.eos_token_id,
+        )
+        ##=====================================## 
+
+        ##=====================================## 
+        ##for comprehensiveness and sufficiency##
+        generated_text_comprehensiveness = tokenizer.decode(model_output_comprehensiveness[0][0], skip_special_tokens=True).split("/INST]")[-1]
+        generated_text_sufficiency = tokenizer.decode(model_output_sufficiency[0][0], skip_special_tokens=True).split("/INST]")[-1]
+        generated_text_comprehensiveness = generated_text_comprehensiveness.strip()
+        generated_text_sufficiency = generated_text_sufficiency.strip()
+        ##=====================================## 
+    
+        print("generated_text_comprehensiveness", generated_text_comprehensiveness)
+        print("--------------")
+        print("generated_text_sufficiency", generated_text_sufficiency)
+        print("--------------")
+
+        #print(generated_text)
+        nyc_data_val[i]['generated_llama2']=generated_text
+
+        ####pred_prob####  test
+        print(f"scores: {model_output.scores}") # too many -inf, leads to predict 1.0 for the predicted word
+        #score = torch.stack(model_output.scores, dim=1)
+        #probs = torch.maximum(score, torch.zeros_like(score)).softmax(-1)
+        probs = torch.stack(model_output.scores, dim=1).softmax(-1)
+        gen_sequences = model_output.sequences[:, input_ids.shape[-1]:]
+        gen_probs = torch.gather(probs, 2, gen_sequences[:, :, None]).squeeze(-1)
+        print(f"gen_probs: {gen_probs.shape}")
+        unique_prob_per_sequence = gen_probs.prod(-1)
+        print(f"unique_prob_per_sequence: {unique_prob_per_sequence.shape}")
+        print(f"unique_prob_per_sequence: {unique_prob_per_sequence}")
+        max_values, max_idxs = torch.max(probs, dim=-1)
+        #print(f"max_values.shape: {max_values.shape}")
+        #print(f"max_idxs.shape: {max_idxs.shape}")
+        tokenized_text = tokenizer.tokenize(generated_text)
+        for token, prob, word_id in zip(tokenized_text, max_values[0], max_idxs[0]):
+            if  "positive" in token:
+                print(f"Token: {token}, Prob: {prob.item()}, Word_id: {word_id.item()}") #positive word_id = 6374
+                positive_id = tokenizer.encode('positive', return_tensors='pt', add_special_tokens=False).item()
+                #positive_id = word_id.item()
+                break
+            if  "negative" in token:
+                print(f"Token: {token}, Prob: {prob.item()}, Word_id: {word_id.item()}") #negative word_id = 8178
+                negative_id = tokenizer.encode('negative', return_tensors='pt', add_special_tokens=False).item()
+                #negative_id = word_id.item()
+                break
+
+        ##=====================================## 
+        ##for comprehensiveness and sufficiency##
+        score = torch.stack(model_output_comprehensiveness.scores, dim=1)
+        probs_comprehensiveness = torch.maximum(score, torch.zeros_like(score)).softmax(-1)
+        max_values, max_idxs = torch.max(probs, dim=-1)
+        tokenized_text_comprehensiveness = tokenizer.tokenize(generated_text_comprehensiveness)
+        for token, prob, word_id in zip(tokenized_text_comprehensiveness, max_values[0], max_idxs[0]):
+            if  "positive" in token or "negative" in token:
+                print(f"Comprehensiveness Token: {token}, Prob: {prob.item()}, Word_id: {word_id.item()}") #positive word_id = 6374 negative = 8178
+                break
+        
+        score = torch.stack(model_output_sufficiency.scores, dim=1)
+        probs_sufficiency = torch.maximum(score, torch.zeros_like(score)).softmax(-1)
+        max_values, max_idxs = torch.max(probs, dim=-1)
+        tokenized_text_sufficiency = tokenizer.tokenize(generated_text_sufficiency)
+        for token, prob, word_id in zip(tokenized_text_sufficiency, max_values[0], max_idxs[0]):
+            if  "positive" in token or "negative" in token:
+                print(f"Sufficiency Token: {token}, Prob: {prob.item()}, Word_id: {word_id.item()}") #positive word_id = 6374 negative = 8178
+                break
+        ##=====================================## 
+
+
+        
+    
+        ##=====================================## 
+        ##For Faithfulness##
+        ##for comprehensiveness and sufficiency##
+        full_prompt_prob = 0
+        Mask_prompt_prob_comprehensiveness = 0
+        Mask_prompt_prob_sufficiency = 0
+
+        for j ,token in enumerate(tokenized_text): #the format is like "The review is positive...", the first positive/negative should be the label.
+            if "negative" in token:
+                goal = "negative"
+                idx = negative_id #8178
+                full_prompt_prob = probs[0,j,idx] #idx is the index of the positive/negative
+                break
+            elif "positive" in token:
+                goal = "positive"
+                idx = positive_id #6374
+                full_prompt_prob = probs[0,j,idx] #idx is the index of the positive/negative
+                break
+        
+        #comprehensiveness
+        for j ,token in enumerate(tokenized_text_comprehensiveness):            
+            if goal in token:
+                Mask_prompt_prob_comprehensiveness = probs_comprehensiveness[0,j,idx] #idx is the index of the positive/negative
+                break
+        
+        comprehensiveness = full_prompt_prob - Mask_prompt_prob_comprehensiveness if full_prompt_prob > Mask_prompt_prob_comprehensiveness else 0
+
+        #sufficiency
+        for j ,token in enumerate(tokenized_text_sufficiency):            
+            if goal in token:
+                Mask_prompt_prob_sufficiency = probs_sufficiency[0,j,idx] #idx is the index of the positive/negative
+                break
+        
+        sufficiency = full_prompt_prob - Mask_prompt_prob_sufficiency if full_prompt_prob > Mask_prompt_prob_sufficiency else 0
+        ##=====================================## 
+        comprehensiveness_list.append(comprehensiveness)
+        sufficiency_list.append(sufficiency)
+        nyc_data_val[i]['comprehensiveness'] = comprehensiveness
+        nyc_data_val[i]['sufficiency'] = sufficiency
+
 
     from numpy import mean, std
     #average_iou_f1 = mean(iou_f1_scores) 
