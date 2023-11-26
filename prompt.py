@@ -3,10 +3,12 @@ import numpy as np
 import torch
 import jsonlines 
 import random 
-import os
 import re
 #from sklearn.metrics import f1_score
 import torch.nn.functional as F
+
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
 
 from util import *
 
@@ -202,16 +204,16 @@ def movie_rationales_llama2(args):
         pattern = r'\"([^\"]+)\"'
 
         explanation_lines = generated_text.split('\n')
-        print("Full Explanation:", explanation_lines)
-        print("---------------------------")    
+        #print("Full Explanation:", explanation_lines)
+        #print("---------------------------")    
 
         important_phrases = []
         for line in explanation_lines:
             matches = re.findall(pattern, line)
             important_phrases += matches
 
-        print("Important Phrases:", important_phrases)
-        print("---------------------------")
+        #print("Important Phrases:", important_phrases)
+        #print("---------------------------")
 
         data.append(important_phrases)     
 
@@ -238,8 +240,8 @@ def movie_rationales_llama2(args):
             val_input_for_comprehensiveness = val_input_for_comprehensiveness.replace(highlight, "   ")
             val_input_for_sufficiency += (highlight + "   ")
         
-        print("val_input_for_comprehensiveness: ", val_input_for_comprehensiveness)
-        print("val_input_for_sufficiency: ", val_input_for_sufficiency)
+        #print("val_input_for_comprehensiveness: ", val_input_for_comprehensiveness)
+        #print("val_input_for_sufficiency: ", val_input_for_sufficiency)
 
         if args.prompt == "two_shot":
 
@@ -271,13 +273,13 @@ def movie_rationales_llama2(args):
             prompt_for_comprehensiveness =  "<s>[INST] Please answer whether the movie review is positive or negative and then list the important phrases." +\
                 input0_for_comprehensiveness + "[/INST]" + label_train_0 +\
                     " the important phrases are " + str(nyc_data_train_two[0]['highlight']) + "</s><s>[INST]" +\
-                        "According to the above two examples, please answer whether the movie review is positive or negative and then list the important phrases. Format the response starting with either 'the review is positive' or 'the review is negative. Again, the response should start with either 'the review is positive' or 'the review is negative." +\
+                        "please answer whether the movie review is positive or negative and then list the important phrases. Format the response starting with either 'the review is positive' or 'the review is negative. Again, the response should start with either 'the review is positive' or 'the review is negative." +\
                             val_input_for_comprehensiveness + "[/INST]"   
             
             prompt_for_sufficiency =  "<s>[INST] Please answer whether the movie review is positive or negative and then list the important phrases." +\
                 input0_for_sufficiency + "[/INST]" + label_train_0 +\
                     " the important phrases are " + str(nyc_data_train_two[0]['highlight']) + "</s><s>[INST]" +\
-                        "According to the above two examples, please answer whether the movie review is positive or negative and then list the important phrases. Format the response starting with either 'the review is positive' or 'the review is negative." +\
+                        "please answer whether the movie review is positive or negative and then list the important phrases. Format the response starting with either 'the review is positive' or 'the review is negative." +\
                             val_input_for_sufficiency + "[/INST]"   
             ##=====================================## 
 
@@ -324,7 +326,7 @@ def movie_rationales_llama2(args):
         generated_text_comprehensiveness = generated_text_comprehensiveness.strip()
         generated_text_sufficiency = generated_text_sufficiency.strip()
         ##=====================================## 
-    
+        
         print("generated_text_comprehensiveness", generated_text_comprehensiveness)
         print("--------------")
         print("generated_text_sufficiency", generated_text_sufficiency)
@@ -342,9 +344,14 @@ def movie_rationales_llama2(args):
         gen_probs = torch.gather(probs, 2, gen_sequences[:, :, None]).squeeze(-1)
         print(f"gen_probs: {gen_probs.shape}")
         unique_prob_per_sequence = gen_probs.prod(-1)
+
         print(f"unique_prob_per_sequence: {unique_prob_per_sequence.shape}")
         print(f"unique_prob_per_sequence: {unique_prob_per_sequence}")
         max_values, max_idxs = torch.max(probs, dim=-1)
+        print(max_idxs)
+        max_idxs_token = tokenizer.decode(max_idxs[0], skip_special_tokens=True)
+        print("max_idxs_token",max_idxs_token)
+        
         #print(f"max_values.shape: {max_values.shape}")
         #print(f"max_idxs.shape: {max_idxs.shape}")
         tokenized_text = tokenizer.tokenize(generated_text)
@@ -352,11 +359,13 @@ def movie_rationales_llama2(args):
             if  "positive" in token:
                 print(f"Token: {token}, Prob: {prob.item()}, Word_id: {word_id.item()}") #positive word_id = 6374
                 positive_id = tokenizer.encode('positive', return_tensors='pt', add_special_tokens=False).item()
+                #print("positive_id",positive_id)
                 #positive_id = word_id.item()
                 break
             if  "negative" in token:
                 print(f"Token: {token}, Prob: {prob.item()}, Word_id: {word_id.item()}") #negative word_id = 8178
                 negative_id = tokenizer.encode('negative', return_tensors='pt', add_special_tokens=False).item()
+                #print("negative_id",negative_id)
                 #negative_id = word_id.item()
                 break
 
@@ -396,11 +405,15 @@ def movie_rationales_llama2(args):
                 goal = "negative"
                 idx = negative_id #8178
                 full_prompt_prob = probs[0,j,idx] #idx is the index of the positive/negative
+                print(f"negative_Token: {token}, Prob: {full_prompt_prob}, Word_id: {idx}") #positive word_id = 6374 negative = 8178
+
                 break
             elif "positive" in token:
                 goal = "positive"
                 idx = positive_id #6374
                 full_prompt_prob = probs[0,j,idx] #idx is the index of the positive/negative
+                print(f"positive_Token: {token}, Prob: {full_prompt_prob}, Word_id: {idx}") #positive word_id = 6374 negative = 8178
+
                 break
         
         #comprehensiveness
@@ -418,6 +431,8 @@ def movie_rationales_llama2(args):
                 break
         
         sufficiency = full_prompt_prob - Mask_prompt_prob_sufficiency if full_prompt_prob > Mask_prompt_prob_sufficiency else 0
+
+
         ##=====================================## 
         comprehensiveness_list.append(comprehensiveness)
         sufficiency_list.append(sufficiency)
@@ -449,7 +464,7 @@ if __name__ == '__main__':
     parser.add_argument('--task_name', default="movie_rationales",  type=str, help='Name of the task that will be used by huggingface load dataset')    
     #parser.add_argument('--subtask', default="explanation", type=str, help="The contest has three subtasks: matching, ranking, explanation")
     parser.add_argument('--llama2_checkpoint', default="meta-llama/Llama-2-7b-chat-hf", type=str, help="The hf name of a llama2 checkpoint")
-    parser.add_argument('--val_size', default=200, type=int, help="The sample size of validation dataset.")
+    parser.add_argument('--val_size', default=5, type=int, help="The sample size of validation dataset.")
     parser.add_argument('--prompt', default="one_shot", type=str, help="Control the type of prompt.")
     args = parser.parse_args()
     if args.prompt not in ["zero_shot", "one_shot", "two_shot"]:
