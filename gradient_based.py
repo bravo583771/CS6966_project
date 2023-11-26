@@ -71,7 +71,7 @@ class ExplainableTransformerPipeline():
             Main entry method. Passes text through series of transformations and through the model. 
             Calls visualization method.
         """
-        prediction = self.__pipeline.predict(text)
+        prediction = self.predict_text(text)
         inputs = self.generate_inputs(text)
         baseline = self.generate_baseline(sequence_len = inputs.shape[1])
         
@@ -96,6 +96,13 @@ class ExplainableTransformerPipeline():
             Convenience method for generation of baseline vector as list of torch tensors
         """        
         return torch.tensor([self.__pipeline.tokenizer.cls_token_id] + [self.__pipeline.tokenizer.pad_token_id] * (sequence_len - 2) + [self.__pipeline.tokenizer.sep_token_id], device = self.__device).unsqueeze(0)
+    
+    def predict_text(self, text: str) -> np.ndarray:
+        """
+            Convenience method for generation of baseline vector as list of torch tensors
+        """        
+        return self.__pipeline.predict(text)
+    
 
 def main(args):
     tokenizer = AutoTokenizer.from_pretrained(args.model_checkpoint, cache_dir = args.cache_dir) 
@@ -128,6 +135,8 @@ def main(args):
 
     iou_f1_scores = []
     token_f1_scores = []
+    comprehensiveness_list = []
+    sufficiency_list = []
 
     for i, obj in enumerate(val_dataset):
         print("The length of the review: {}.".format(len(obj["input"])))
@@ -154,7 +163,7 @@ def main(args):
             #highlight = exp_model.explain(obj["input"], os.path.join(args.output_dir,f'example_{idx}'), proportion)
             #print("highlight",highlight)
 
-            val_dataset[i]['gradient_highlight']=final_highlight
+            val_dataset[i]['gradient_highlight'] = final_highlight
 
             target_labels = [word for label in obj['highlight'] for word in label.split() if word.isalpha()]
 
@@ -177,15 +186,45 @@ def main(args):
             iou_f1_scores.append(iou_f1)
             token_f1_scores.append(token_f1)
 
+            ##=====================================## 
+            ##for comprehensiveness and sufficiency##
+            full_input_prediction = exp_model.predict_text(obj["input"])
+            print(f"full_input_prediction: {full_input_prediction}")
+
+            val_input_for_comprehensiveness = obj['input']
+            val_input_for_sufficiency = ""
+            for highlight in final_highlight:
+                val_input_for_comprehensiveness = val_input_for_comprehensiveness.replace(highlight, "   ")
+                val_input_for_sufficiency += (highlight + "   ")
+        
+            print("val_input_for_comprehensiveness: ", val_input_for_comprehensiveness)
+            print("val_input_for_sufficiency: ", val_input_for_sufficiency)
+
+            comprehensiveness_input_prediction = exp_model.predict_text(val_input_for_comprehensiveness)
+            sufficiency_input_prediction = exp_model.predict_text(val_input_for_sufficiency)
+            print(f"comprehensiveness_input_prediction: {comprehensiveness_input_prediction}")
+            print(f"sufficiency_input_prediction: {sufficiency_input_prediction}")
+
+            comprehensiveness = full_input_prediction.item() - comprehensiveness_input_prediction.item() if full_input_prediction > comprehensiveness_input_prediction else 0
+            sufficiency = full_input_prediction.item() - sufficiency_input_prediction.item() if full_input_prediction > sufficiency_input_prediction else 0
+            
+            comprehensiveness_list.append(comprehensiveness)
+            sufficiency_list.append(sufficiency)
+            val_dataset[i]['comprehensiveness'] = comprehensiveness
+            val_dataset[i]['sufficiency'] = sufficiency
+
         idx+=1
         print (f"Example {idx} done")
 
-    average_iou_f1 = sum(iou_f1_scores) / len(iou_f1_scores)
-    average_token_f1 = sum(token_f1_scores) / len(token_f1_scores)
-    #Average IOU F1 Score (microsoft/deberta-v3-base): 0.18671051518870413
-    #Average Token F1 Score (microsoft/deberta-v3-base): 0.18671051518870413
-    print("Average IOU F1 Score:", average_iou_f1)
-    print("Average Token F1 Score:", average_token_f1)
+    from numpy import mean, std
+    #average_iou_f1 = mean(iou_f1_scores) 
+    #average_token_f1 = mean(token_f1_scores) 
+    #average_comprehensiveness = mean(comprehensiveness_list) 
+    #average_sufficiency = mean(sufficiency_list) 
+    print(f"Average IOU F1 Score: {mean(iou_f1_scores) }, standard deviation: {std(iou_f1_scores)}")
+    print(f"Average Token F1 Score: {mean(token_f1_scores)}, standard deviation: {std(token_f1_scores)}")
+    print(f"Average comprehensiveness: {mean(comprehensiveness_list) }, standard deviation: {std(comprehensiveness_list)}")
+    print(f"Average sufficiency: {mean(sufficiency_list)}, standard deviation: {std(sufficiency_list)}")
 
     out = os.path.join(args.output_dir, 'gradient_based_' + args.analysis_file)
     with jsonlines.open(out, mode='w') as writer:
@@ -198,7 +237,7 @@ if __name__ == '__main__':
     parser.add_argument('--analsis_dir', default='out', type=str, help='Directory where attribution figures will be saved')
     parser.add_argument('--model_checkpoint', type=str, default='microsoft/deberta-v3-base', help='model checkpoint')
     #parser.add_argument('--model_checkpoint', type=str, default='meta-llama/Llama-2-7b-chat-hf', help='model checkpoint')
-    parser.add_argument('--analysis_file', type=str, default='val_one_shot.jsonl', help='path to a1 analysis file')
+    parser.add_argument('--analysis_file', type=str, default='val.jsonl', help='path to a1 analysis file')
     parser.add_argument('--num_labels', default=2, type=int, help='Task number of labels')
     parser.add_argument('--output_dir', default='out', type=str, help='Directory where model checkpoints will be saved')    
     parser.add_argument('--cache_dir', type=str, help='Directory where cache will be saved')
