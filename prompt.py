@@ -384,7 +384,7 @@ def movie_rationales_llama2(args):
                 print(f"comprehensiveness, Prob: {Mask_prompt_prob_comprehensiveness}, Word_id: {word_id}") 
                 break
         
-        comprehensiveness = full_prompt_prob - Mask_prompt_prob_comprehensiveness if full_prompt_prob > Mask_prompt_prob_comprehensiveness else 0
+        comprehensiveness = full_prompt_prob.item() - Mask_prompt_prob_comprehensiveness.item() if full_prompt_prob > Mask_prompt_prob_comprehensiveness else 0
 
         #sufficiency
         max_values, max_idxs = torch.max(probs_sufficiency, dim=-1)
@@ -394,7 +394,7 @@ def movie_rationales_llama2(args):
                 print(f"sufficiency, Prob: {Mask_prompt_prob_comprehensiveness}, Word_id: {word_id}") 
                 break
         
-        sufficiency = full_prompt_prob - Mask_prompt_prob_sufficiency if full_prompt_prob > Mask_prompt_prob_sufficiency else 0
+        sufficiency = full_prompt_prob.item() - Mask_prompt_prob_sufficiency.item() if full_prompt_prob > Mask_prompt_prob_sufficiency else 0
         ##=====================================## 
         comprehensiveness_list.append(comprehensiveness)
         sufficiency_list.append(sufficiency)
