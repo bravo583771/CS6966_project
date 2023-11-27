@@ -358,17 +358,12 @@ def movie_rationales_llama2(args):
         for j, word_id in enumerate(max_idxs[0]):
             if  word_id == negative_id:
                 idx = negative_id #8178
-                full_prompt_prob = probs[0,j,idx] if isinstance(probs[0,j,idx], int)\
-                    else probs[0,j,idx].item()
-                
-                #idx is the index of the positive/negative
+                full_prompt_prob = probs[0,j,idx] #idx is the index of the positive/negative
                 print(f"Negative, Prob: {full_prompt_prob}, Word_id: {word_id}") #negative word_id = 8178
                 break
             if  word_id == positive_id:
                 idx = positive_id #6374
-                full_prompt_prob = probs[0,j,idx] if isinstance(probs[0,j,idx], int)\
-                    else probs[0,j,idx].item()
-                #idx is the index of the positive/negative
+                full_prompt_prob = probs[0,j,idx] #idx is the index of the positive/negative
                 print(f"Positive, Prob: {full_prompt_prob}, Word_id: {word_id}") #positive word_id = 6374
                 break
 
@@ -385,25 +380,44 @@ def movie_rationales_llama2(args):
         max_values, max_idxs = torch.max(probs_comprehensiveness, dim=-1)
         for j, word_id in enumerate(max_idxs[0]):            
             if word_id == idx:
-                Mask_prompt_prob_comprehensiveness = probs_comprehensiveness[0,j,idx] if isinstance(probs_comprehensiveness[0,j,idx], int)\
-                    else probs_comprehensiveness[0,j,idx].item()
-                #idx is the index of the positive/negative
+                Mask_prompt_prob_comprehensiveness = probs_comprehensiveness[0,j,idx] #idx is the index of the positive/negative
                 print(f"comprehensiveness, Prob: {Mask_prompt_prob_comprehensiveness}, Word_id: {word_id}") 
                 break
-        
+
+        if type(full_prompt_prob) == int or type(full_prompt_prob) == float:
+            full_prompt_prob = full_prompt_prob
+        else:
+            full_prompt_prob = full_prompt_prob.item() 
+
+        if type(Mask_prompt_prob_comprehensiveness) == int or type(Mask_prompt_prob_comprehensiveness) == float:
+            Mask_prompt_prob_comprehensiveness = Mask_prompt_prob_comprehensiveness
+        else:
+            Mask_prompt_prob_comprehensiveness = Mask_prompt_prob_comprehensiveness.item() 
+
         comprehensiveness = full_prompt_prob - Mask_prompt_prob_comprehensiveness if full_prompt_prob > Mask_prompt_prob_comprehensiveness else 0
+        #print("full_prompt_prob",full_prompt_prob)
+        #print("Mask_prompt_prob_comprehensiveness",Mask_prompt_prob_comprehensiveness)
+
 
         #sufficiency
         max_values, max_idxs = torch.max(probs_sufficiency, dim=-1)
         for j, word_id in enumerate(max_idxs[0]):            
             if word_id == idx:
-                Mask_prompt_prob_sufficiency = probs_sufficiency[0,j,idx] if isinstance(probs_sufficiency[0,j,idx], int)\
-                    else probs_sufficiency[0,j,idx].item()
-                #idx is the index of the positive/negative
-                print(f"sufficiency, Prob: {Mask_prompt_prob_comprehensiveness}, Word_id: {word_id}") 
+                Mask_prompt_prob_sufficiency = probs_sufficiency[0,j,idx] #idx is the index of the positive/negative
+                print(f"sufficiency, Prob: {Mask_prompt_prob_sufficiency}, Word_id: {word_id}") 
                 break
-        
+
+
+        if type(Mask_prompt_prob_sufficiency) == int or type(Mask_prompt_prob_sufficiency) == float:
+            Mask_prompt_prob_sufficiency = Mask_prompt_prob_sufficiency
+        else:
+            Mask_prompt_prob_sufficiency = Mask_prompt_prob_sufficiency 
+
         sufficiency = full_prompt_prob - Mask_prompt_prob_sufficiency if full_prompt_prob > Mask_prompt_prob_sufficiency else 0
+        #print("full_prompt_prob",full_prompt_prob)
+        #print("Mask_prompt_prob_comprehensiveness",Mask_prompt_prob_sufficiency)
+
+
         ##=====================================## 
         comprehensiveness_list.append(comprehensiveness)
         sufficiency_list.append(sufficiency)
@@ -435,7 +449,7 @@ if __name__ == '__main__':
     parser.add_argument('--task_name', default="movie_rationales",  type=str, help='Name of the task that will be used by huggingface load dataset')    
     #parser.add_argument('--subtask', default="explanation", type=str, help="The contest has three subtasks: matching, ranking, explanation")
     parser.add_argument('--llama2_checkpoint', default="meta-llama/Llama-2-7b-chat-hf", type=str, help="The hf name of a llama2 checkpoint")
-    parser.add_argument('--val_size', default=5, type=int, help="The sample size of validation dataset.")
+    parser.add_argument('--val_size', default=200, type=int, help="The sample size of validation dataset.")
     parser.add_argument('--prompt', default="one_shot", type=str, help="Control the type of prompt.")
     args = parser.parse_args()
     if args.prompt not in ["zero_shot", "one_shot", "two_shot"]:
