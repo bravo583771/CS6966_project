@@ -8,9 +8,11 @@ import re
 import torch.nn.functional as F
 
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "2"
-
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2"
 from util import *
+
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
 def movie_rationales_llama2(args): 
     print("Loading data")
@@ -47,7 +49,7 @@ def movie_rationales_llama2(args):
 
     access_token = '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'
     tokenizer = AutoTokenizer.from_pretrained(args.llama2_checkpoint, cache_dir = args.cache_dir, token=access_token)
-    model = AutoModelForCausalLM.from_pretrained(args.llama2_checkpoint, output_scores=True, return_dict_in_generate=True, token=access_token)
+    model = AutoModelForCausalLM.from_pretrained(args.llama2_checkpoint, output_scores=True, return_dict_in_generate=True, token=access_token).to(device)
 
     iou_f1_scores = []
     token_f1_scores = []
@@ -179,7 +181,7 @@ def movie_rationales_llama2(args):
 
         """
 
-        input_ids = tokenizer.encode(prompt, return_tensors='pt', add_special_tokens=False)
+        input_ids = tokenizer.encode(prompt, return_tensors='pt', add_special_tokens=False).to(device)
 
         # Generate text output
         model_output = model.generate(
@@ -190,8 +192,7 @@ def movie_rationales_llama2(args):
             return_dict_in_generate=True,
             do_sample=True,
             #eos_token_id=tokenizer.eos_token_id,
-        )        
-
+        )
         # Decode the generated token IDs to text
         #generated_text = tokenizer.decode(model_output[0], skip_special_tokens=True).split("/INST]")[-1]
         generated_text = tokenizer.decode(model_output[0][0], skip_special_tokens=True).split("/INST]")[-1]
@@ -296,8 +297,8 @@ def movie_rationales_llama2(args):
 
         ##=====================================## 
         ##for comprehensiveness and sufficiency##
-        input_ids_comprehensiveness = tokenizer.encode(prompt_for_comprehensiveness, return_tensors='pt', add_special_tokens=False)
-        input_ids_sufficiency = tokenizer.encode(prompt_for_sufficiency, return_tensors='pt', add_special_tokens=False)
+        input_ids_comprehensiveness = tokenizer.encode(prompt_for_comprehensiveness, return_tensors='pt', add_special_tokens=False).to(device)
+        input_ids_sufficiency = tokenizer.encode(prompt_for_sufficiency, return_tensors='pt', add_special_tokens=False).to(device)
 
         model_output_comprehensiveness = model.generate(
             input_ids_comprehensiveness,
@@ -430,6 +431,7 @@ def movie_rationales_llama2(args):
     #average_token_f1 = mean(token_f1_scores) 
     #average_comprehensiveness = mean(comprehensiveness_list) 
     #average_sufficiency = mean(sufficiency_list) 
+    print("one_shot")
     print(f"Average IOU F1 Score: {mean(iou_f1_scores) }, standard deviation: {std(iou_f1_scores)}")
     print(f"Average Token F1 Score: {mean(token_f1_scores)}, standard deviation: {std(token_f1_scores)}")
     print(f"Average comprehensiveness: {mean(comprehensiveness_list) }, standard deviation: {std(comprehensiveness_list)}")
