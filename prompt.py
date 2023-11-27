@@ -358,12 +358,17 @@ def movie_rationales_llama2(args):
         for j, word_id in enumerate(max_idxs[0]):
             if  word_id == negative_id:
                 idx = negative_id #8178
-                full_prompt_prob = probs[0,j,idx] #idx is the index of the positive/negative
+                full_prompt_prob = probs[0,j,idx] if isinstance(probs[0,j,idx], int)\
+                    else probs[0,j,idx].item()
+                
+                #idx is the index of the positive/negative
                 print(f"Negative, Prob: {full_prompt_prob}, Word_id: {word_id}") #negative word_id = 8178
                 break
             if  word_id == positive_id:
                 idx = positive_id #6374
-                full_prompt_prob = probs[0,j,idx] #idx is the index of the positive/negative
+                full_prompt_prob = probs[0,j,idx] if isinstance(probs[0,j,idx], int)\
+                    else probs[0,j,idx].item()
+                #idx is the index of the positive/negative
                 print(f"Positive, Prob: {full_prompt_prob}, Word_id: {word_id}") #positive word_id = 6374
                 break
 
@@ -380,21 +385,25 @@ def movie_rationales_llama2(args):
         max_values, max_idxs = torch.max(probs_comprehensiveness, dim=-1)
         for j, word_id in enumerate(max_idxs[0]):            
             if word_id == idx:
-                Mask_prompt_prob_comprehensiveness = probs_comprehensiveness[0,j,idx] #idx is the index of the positive/negative
+                Mask_prompt_prob_comprehensiveness = probs_comprehensiveness[0,j,idx] if isinstance(probs_comprehensiveness[0,j,idx], int)\
+                    else probs_comprehensiveness[0,j,idx].item()
+                #idx is the index of the positive/negative
                 print(f"comprehensiveness, Prob: {Mask_prompt_prob_comprehensiveness}, Word_id: {word_id}") 
                 break
         
-        comprehensiveness = full_prompt_prob.item() - Mask_prompt_prob_comprehensiveness.item() if full_prompt_prob > Mask_prompt_prob_comprehensiveness else 0
+        comprehensiveness = full_prompt_prob - Mask_prompt_prob_comprehensiveness if full_prompt_prob > Mask_prompt_prob_comprehensiveness else 0
 
         #sufficiency
         max_values, max_idxs = torch.max(probs_sufficiency, dim=-1)
         for j, word_id in enumerate(max_idxs[0]):            
             if word_id == idx:
-                Mask_prompt_prob_sufficiency = probs_sufficiency[0,j,idx] #idx is the index of the positive/negative
+                Mask_prompt_prob_sufficiency = probs_sufficiency[0,j,idx] if isinstance(probs_sufficiency[0,j,idx], int)\
+                    else probs_sufficiency[0,j,idx].item()
+                #idx is the index of the positive/negative
                 print(f"sufficiency, Prob: {Mask_prompt_prob_comprehensiveness}, Word_id: {word_id}") 
                 break
         
-        sufficiency = full_prompt_prob.item() - Mask_prompt_prob_sufficiency.item() if full_prompt_prob > Mask_prompt_prob_sufficiency else 0
+        sufficiency = full_prompt_prob - Mask_prompt_prob_sufficiency if full_prompt_prob > Mask_prompt_prob_sufficiency else 0
         ##=====================================## 
         comprehensiveness_list.append(comprehensiveness)
         sufficiency_list.append(sufficiency)
