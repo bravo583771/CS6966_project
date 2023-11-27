@@ -188,7 +188,7 @@ def main(args):
 
             ##=====================================## 
             ##for comprehensiveness and sufficiency##
-            full_input_prediction = exp_model.predict_text(obj["input"])
+            full_input_prediction = exp_model.predict_text(obj["input"])[0]['score']
             print(f"full_input_prediction: {full_input_prediction}")
 
             val_input_for_comprehensiveness = obj['input']
@@ -200,13 +200,13 @@ def main(args):
             print("val_input_for_comprehensiveness: ", val_input_for_comprehensiveness)
             print("val_input_for_sufficiency: ", val_input_for_sufficiency)
 
-            comprehensiveness_input_prediction = exp_model.predict_text(val_input_for_comprehensiveness)
-            sufficiency_input_prediction = exp_model.predict_text(val_input_for_sufficiency)
+            comprehensiveness_input_prediction = exp_model.predict_text(val_input_for_comprehensiveness)[0]['score']
+            sufficiency_input_prediction = exp_model.predict_text(val_input_for_sufficiency)[0]['score']
             print(f"comprehensiveness_input_prediction: {comprehensiveness_input_prediction}")
             print(f"sufficiency_input_prediction: {sufficiency_input_prediction}")
 
-            comprehensiveness = full_input_prediction.item() - comprehensiveness_input_prediction.item() if full_input_prediction > comprehensiveness_input_prediction else 0
-            sufficiency = full_input_prediction.item() - sufficiency_input_prediction.item() if full_input_prediction > sufficiency_input_prediction else 0
+            comprehensiveness = full_input_prediction - comprehensiveness_input_prediction if full_input_prediction > comprehensiveness_input_prediction else 0
+            sufficiency = full_input_prediction - sufficiency_input_prediction if full_input_prediction > sufficiency_input_prediction else 0
             
             comprehensiveness_list.append(comprehensiveness)
             sufficiency_list.append(sufficiency)
