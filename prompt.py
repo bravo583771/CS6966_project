@@ -412,7 +412,7 @@ def movie_rationales_llama2(args):
         if type(Mask_prompt_prob_sufficiency) == int or type(Mask_prompt_prob_sufficiency) == float:
             Mask_prompt_prob_sufficiency = Mask_prompt_prob_sufficiency
         else:
-            Mask_prompt_prob_sufficiency = Mask_prompt_prob_sufficiency 
+            Mask_prompt_prob_sufficiency = Mask_prompt_prob_sufficiency.item() 
 
         sufficiency = full_prompt_prob - Mask_prompt_prob_sufficiency if full_prompt_prob > Mask_prompt_prob_sufficiency else 0
         #print("full_prompt_prob",full_prompt_prob)
