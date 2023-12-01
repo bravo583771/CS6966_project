@@ -23,14 +23,6 @@ import os
 
 from util import *
 
-"""
-Average IOU F1 Score: 0.19651805975062117, standard deviation: 0.10325654153274418
-Average Token F1 Score: 0.19651805975062117, standard deviation: 0.10325654153274416
-Average comprehensiveness: 0.0015938799632223028, standard deviation: 0.002006300500907498
-Average sufficiency: 0.0, standard deviation: 0.0
-"""
-
-
 class ExplainableTransformerPipeline():
     """Wrapper for Captum framework usage with Huggingface Pipeline"""
     
@@ -59,7 +51,9 @@ class ExplainableTransformerPipeline():
         
         a = pd.Series(attr.cpu().numpy()[0][::-1], 
                          index = self.__pipeline.tokenizer.convert_ids_to_tokens(inputs.detach().cpu().numpy()[0])[::-1])
-
+        #print(len(self.__pipeline.tokenizer.convert_ids_to_tokens(inputs.detach().cpu().numpy()[0])[::-1]))
+        #print(self.__pipeline.tokenizer.convert_ids_to_tokens(inputs.detach().cpu().numpy()[0])[::-1])
+        #print(attr.cpu().numpy()[0][::-1])
         a.plot.barh(figsize=(10,20))
         plt.savefig(outfile_path)
     
@@ -75,7 +69,7 @@ class ExplainableTransformerPipeline():
     def explain(self, text: str, outfile_path: str, proportion: float):
         """
             Main entry method. Passes text through series of transformations and through the model. 
-            Calls visualization method. 
+            Calls visualization method.
         """
         prediction = self.predict_text(text)
         inputs = self.generate_inputs(text)
@@ -113,6 +107,14 @@ class ExplainableTransformerPipeline():
 def main(args):
     tokenizer = AutoTokenizer.from_pretrained(args.model_checkpoint, cache_dir = args.cache_dir) 
     model = AutoModelForSequenceClassification.from_pretrained(args.model_checkpoint, num_labels=args.num_labels, cache_dir = args.cache_dir)
+
+    '''
+    access_token = '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'
+    tokenizer = AutoTokenizer.from_pretrained(args.model_checkpoint, cache_dir = args.cache_dir, token=access_token)
+    model = AutoModelForSequenceClassification.from_pretrained(args.model_checkpoint, num_labels=args.num_labels, cache_dir = args.cache_dir, token=access_token)
+    
+    '''
+
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -215,7 +217,10 @@ def main(args):
         print (f"Example {idx} done")
 
     from numpy import mean, std
-
+    #average_iou_f1 = mean(iou_f1_scores) 
+    #average_token_f1 = mean(token_f1_scores) 
+    #average_comprehensiveness = mean(comprehensiveness_list) 
+    #average_sufficiency = mean(sufficiency_list) 
     print(f"Average IOU F1 Score: {mean(iou_f1_scores) }, standard deviation: {std(iou_f1_scores)}")
     print(f"Average Token F1 Score: {mean(token_f1_scores)}, standard deviation: {std(token_f1_scores)}")
     print(f"Average comprehensiveness: {mean(comprehensiveness_list) }, standard deviation: {std(comprehensiveness_list)}")
@@ -229,15 +234,12 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--seed', default = 123, type=int, help='Random seed set') # <======================> 
     parser.add_argument('--analsis_dir', default='out', type=str, help='Directory where attribution figures will be saved')
     parser.add_argument('--model_checkpoint', type=str, default='microsoft/deberta-v3-base', help='model checkpoint')
-    #parser.add_argument('--model_checkpoint', type=str, default='meta-llama/Llama-2-7b-chat-hf', help='model checkpoint') #This is only for text generation
+    #parser.add_argument('--model_checkpoint', type=str, default='meta-llama/Llama-2-7b-chat-hf', help='model checkpoint')
     parser.add_argument('--analysis_file', type=str, default='val.jsonl', help='path to a1 analysis file')
     parser.add_argument('--num_labels', default=2, type=int, help='Task number of labels')
     parser.add_argument('--output_dir', default='out', type=str, help='Directory where model checkpoints will be saved')    
     parser.add_argument('--cache_dir', type=str, help='Directory where cache will be saved')
     args = parser.parse_args()
-    np.random.seed(args.seed)
-    torch.manual_seed(args.seed)
     main(args)
