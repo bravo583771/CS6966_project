@@ -157,3 +157,6 @@ test.ipynb
 
 #batch files
 *.sh  
+
+#other
+*.pptx
