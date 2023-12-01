@@ -59,7 +59,6 @@ class ExplainableTransformerPipeline():
         
         a = pd.Series(attr.cpu().numpy()[0][::-1], 
                          index = self.__pipeline.tokenizer.convert_ids_to_tokens(inputs.detach().cpu().numpy()[0])[::-1])
-
         a.plot.barh(figsize=(10,20))
         plt.savefig(outfile_path)
     
@@ -215,7 +214,6 @@ def main(args):
         print (f"Example {idx} done")
 
     from numpy import mean, std
-
     print(f"Average IOU F1 Score: {mean(iou_f1_scores) }, standard deviation: {std(iou_f1_scores)}")
     print(f"Average Token F1 Score: {mean(token_f1_scores)}, standard deviation: {std(token_f1_scores)}")
     print(f"Average comprehensiveness: {mean(comprehensiveness_list) }, standard deviation: {std(comprehensiveness_list)}")

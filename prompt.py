@@ -136,6 +136,7 @@ def movie_rationales_llama2(args):
         label_train_0 = label4prompt(nyc_data_train_two[0]['target']) # 0 = negative, 1 = positive
         label_train_1 = label4prompt(nyc_data_train_two[1]['target']) # 0 = negative, 1 = positive
         
+
         if args.prompt == "two_shot":
             prompt =  "<s>[INST] Please answer whether the movie review is positive or negative and then list the important phrases." +\
                 nyc_data_train_two[0]['input'] + "[/INST]" + label_train_0 +\

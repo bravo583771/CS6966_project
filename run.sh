@@ -28,5 +28,5 @@ python prompt.py --cache_dir ${CACHE_DIR} --prompt zero_shot --val_size 76
 python prompt.py --cache_dir ${CACHE_DIR} --prompt one_shot --val_size 76  
 python prompt.py --cache_dir ${CACHE_DIR} --prompt two_shot --val_size 76  
 
-#python gradient_based.py --cache_dir ${CACHE_DIR} --analysis_file val.jsonl
+python gradient_based.py --cache_dir ${CACHE_DIR} --analysis_file val.jsonl
 
